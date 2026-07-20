@@ -1,0 +1,75 @@
+<%- include('partials/header', { title: 'Dashboard — Calibration Tracker', username }) %>
+
+<h1>Dashboard</h1>
+<p class="subtitle">Upcoming and overdue calibrations, sorted soonest first.</p>
+
+<% if (typeof flash !== 'undefined' && flash) { %>
+  <div class="empty-state" style="border-color:#2e7d32; color:#2e7d32;"><%= flash %></div>
+<% } %>
+
+<div class="stats">
+  <div class="stat-card red">
+    <div class="num"><%= overdueCount %></div>
+    <div class="label">Overdue</div>
+  </div>
+  <div class="stat-card amber">
+    <div class="num"><%= dueSoonCount %></div>
+    <div class="label">Due within 14 days</div>
+  </div>
+  <div class="stat-card">
+    <div class="num"><%= totalCount %></div>
+    <div class="label">Total equipment tracked</div>
+  </div>
+</div>
+
+<div class="actions-row">
+  <div></div>
+  <div>
+    <a href="/customers" class="btn secondary">Manage Customers</a>
+    <a href="/notifications" class="btn secondary">Notification Log</a>
+    <form method="POST" action="/notify-now" style="display:inline">
+      <button type="submit" class="btn secondary">Send Reminders Now</button>
+    </form>
+    <a href="/equipment/new" class="btn gold">+ Add Equipment</a>
+  </div>
+</div>
+
+<% if (equipment.length === 0) { %>
+  <div class="empty-state">
+    No equipment yet. <a href="/customers/new">Add a customer</a> first, then <a href="/equipment/new">add their equipment</a>.
+  </div>
+<% } else { %>
+<table>
+  <thead>
+    <tr>
+      <th>Customer</th>
+      <th>Brand / Model</th>
+      <th>Serial No.</th>
+      <th>Last Calibration</th>
+      <th>Next Calibration</th>
+      <th>Status</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <% equipment.forEach(e => { %>
+      <tr>
+        <td><%= e.customer_name %><br><span class="hint"><%= e.customer_phone || '' %></span></td>
+        <td><%= e.brand || '—' %> <%= e.model || '' %></td>
+        <td><%= e.serial_number || '—' %></td>
+        <td><%= e.last_calibration_date || '—' %></td>
+        <td><%= e.next_calibration_date || '—' %> <span class="badge <%= e.badge.className %>"><%= e.badge.label %></span></td>
+        <td><%= e.status %></td>
+        <td>
+          <form method="POST" action="/equipment/<%= e.id %>/mark-done" style="display:inline">
+            <button type="submit" class="btn small secondary">Mark Done Today</button>
+          </form>
+          <a href="/equipment/<%= e.id %>/edit" class="btn small secondary">Edit</a>
+        </td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<% } %>
+
+<%- include('partials/footer') %>

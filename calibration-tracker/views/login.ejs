@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login — Calibration Tracker</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+
+    <div class="login-card">
+      <div class="login-logo-badge">
+        <img src="/images/suleco.png" alt="Suleco" class="login-logo">
+      </div>
+      <h1>Calibration Tracker</h1>
+      <p class="subtitle">Sign in to manage calibrations</p>
+      <% if (error) { %>
+        <div class="error-msg"><%= error %></div>
+      <% } %>
+      <form method="POST" action="/login">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" name="username" required autofocus placeholder="admin">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" name="password" required placeholder="••••••••">
+        </div>
+        <button type="submit" class="btn-gradient">Log In</button>
+      </form>
+      <p class="hint">Default: admin / admin123 (set in .env)</p>
+    </div>
+  </div>
+</body>
+</html>

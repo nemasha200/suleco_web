@@ -1,0 +1,54 @@
+<%- include('../partials/header', { title: (equipment ? 'Edit' : 'Add') + ' Equipment', username }) %>
+
+<h1><%= equipment ? 'Edit Equipment' : 'Add Equipment' %></h1>
+<p class="subtitle">Next calibration date is calculated automatically: last calibration date + 6 months.</p>
+
+<div class="card">
+  <form method="POST" action="<%= equipment ? '/equipment/' + equipment.id + '/edit' : '/equipment/new' %>">
+    <div class="form-group">
+      <label>Customer *</label>
+      <select name="customer_id" required>
+        <option value="">Select a customer…</option>
+        <% customers.forEach(c => { %>
+          <option value="<%= c.id %>" <%= equipment && equipment.customer_id === c.id ? 'selected' : '' %>>
+            <%= c.name %><%= c.company ? ' — ' + c.company : '' %>
+          </option>
+        <% }) %>
+      </select>
+      <div class="hint">No customer yet? <a href="/customers/new">Add one first</a>.</div>
+    </div>
+    <div class="form-group">
+      <label>Brand</label>
+      <input type="text" name="brand" value="<%= equipment ? (equipment.brand || '') : '' %>" placeholder="e.g. Leica, Topcon, Sokkia">
+    </div>
+    <div class="form-group">
+      <label>Model</label>
+      <input type="text" name="model" value="<%= equipment ? (equipment.model || '') : '' %>">
+    </div>
+    <div class="form-group">
+      <label>Serial Number</label>
+      <input type="text" name="serial_number" value="<%= equipment ? (equipment.serial_number || '') : '' %>">
+    </div>
+    <div class="form-group">
+      <label>Last Calibration Date</label>
+      <input type="date" name="last_calibration_date" value="<%= equipment ? (equipment.last_calibration_date || '') : '' %>">
+      <div class="hint">Next calibration date will auto-set to 6 months after this date on save.</div>
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select name="status">
+        <% ['Pending','Completed','Needs Repair','No Response'].forEach(s => { %>
+          <option value="<%= s %>" <%= equipment && equipment.status === s ? 'selected' : '' %>><%= s %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Notes</label>
+      <textarea name="notes"><%= equipment ? (equipment.notes || '') : '' %></textarea>
+    </div>
+    <button type="submit" class="btn">Save Equipment</button>
+    <a href="/" class="btn secondary">Cancel</a>
+  </form>
+</div>
+
+<%- include('../partials/footer') %>

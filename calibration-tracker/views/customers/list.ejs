@@ -1,0 +1,44 @@
+<%- include('../partials/header', { title: 'Customers — Calibration Tracker', username }) %>
+
+<h1>Customers</h1>
+<p class="subtitle">All client records.</p>
+
+<div class="actions-row">
+  <div></div>
+  <a href="/customers/new" class="btn gold">+ Add Customer</a>
+</div>
+
+<% if (customers.length === 0) { %>
+  <div class="empty-state">No customers yet. <a href="/customers/new">Add your first one</a>.</div>
+<% } else { %>
+<table>
+  <thead>
+    <tr>
+      <th>CompanyName</th>
+      <th>Company Address</th>
+      <th>Phone</th>
+      <th>Email</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <% customers.forEach(c => { %>
+      <tr>
+        <td><%= c.name %></td>
+        <td><%= c.company || '—' %></td>
+        <td><%= c.phone || '—' %></td>
+        <td><%= c.email || '—' %></td>
+        <td>
+          <a href="/customers/<%= c.id %>/edit" class="btn small secondary">Edit</a>
+          <form method="POST" action="/customers/<%= c.id %>/delete" style="display:inline"
+                onsubmit="return confirm('Delete this customer and all their equipment records?');">
+            <button type="submit" class="btn small danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<% } %>
+
+<%- include('../partials/footer') %>
