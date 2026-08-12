@@ -1,0 +1,89 @@
+<%- include('partials/header', { title: 'Search — Calibration Tracker', username, q }) %>
+
+<h1>Search</h1>
+<p class="subtitle">
+  <% if (q) { %>
+    Results for "<strong><%= q %></strong>"
+  <% } else { %>
+    Search by serial number (also matches customer name, brand, or equipment type).
+  <% } %>
+</p>
+
+<% if (!q) { %>
+  <div class="empty-state">Type a serial number in the search box above and hit Search.</div>
+<% } else if (results.length === 0) { %>
+  <div class="empty-state">No equipment matched "<%= q %>".</div>
+<% } else { %>
+
+  <% results.forEach(e => { %>
+    <div class="card" style="margin-bottom: 20px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <div style="font-size: 17px; font-weight: 700; color: var(--navy);">
+            <%= e.serial_number || '—' %>
+            <span class="badge <%= e.badge.className %>" style="margin-left: 8px;"><%= e.badge.label %></span>
+          </div>
+          <div class="hint" style="margin-top: 4px;">
+            <%= e.brand || '—' %> <%= e.equipment_type || '' %> &middot;
+            <%= e.customer_name %><% if (e.customer_phone) { %> &middot; <%= e.customer_phone %><% } %>
+          </div>
+        </div>
+        <div>
+          <a href="/equipment/<%= e.id %>/edit" class="btn small secondary">Edit Equipment</a>
+          <form method="POST" action="/equipment/<%= e.id %>/mark-done" style="display:inline">
+            <button type="submit" class="btn small secondary">Mark Done Today</button>
+          </form>
+          <a href="/calibrations/new" class="btn small gold">+ Add Calibration</a>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 16px;">
+        <div>
+          <div class="hint" style="margin-bottom: 3px;">Last Calibration</div>
+          <div style="font-weight: 600; font-size: 14px;"><%= e.last_calibration_date || '—' %></div>
+        </div>
+        <div>
+          <div class="hint" style="margin-bottom: 3px;">Next Calibration</div>
+          <div style="font-weight: 600; font-size: 14px;"><%= e.next_calibration_date || '—' %></div>
+        </div>
+        <div>
+          <div class="hint" style="margin-bottom: 3px;">Status</div>
+          <div style="font-weight: 600; font-size: 14px;"><%= e.status || '—' %></div>
+        </div>
+      </div>
+
+      <% if (e.calibrations.length > 0) { %>
+        <div style="margin-top: 18px;">
+          <div class="hint" style="margin-bottom: 8px;">Calibration History</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th>Done?</th>
+                <th>Status</th>
+                <th>Done Date</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% e.calibrations.forEach(c => { %>
+                <tr>
+                  <td><%= c.description || '—' %></td>
+                  <td><%= c.done %></td>
+                  <td><%= c.status || '—' %></td>
+                  <td><%= c.done_date || '—' %></td>
+                  <td><a href="/calibrations/<%= c.id %>/edit" class="btn small secondary">Edit</a></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <div class="hint" style="margin-top: 14px;">No calibration records logged for this equipment yet.</div>
+      <% } %>
+    </div>
+  <% }) %>
+
+<% } %>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,186 @@
+<%- include('partials/header', { title: 'Dashboard — Calibration Tracker', username }) %>
+
+<h1>Dashboard</h1>
+<p class="subtitle">Upcoming and overdue calibrations, sorted soonest first.</p>
+
+<% if (typeof flash !== 'undefined' && flash) { %>
+  <div id="flashAlert" class="alert alert-success alert-dismissible fade show d-flex align-items-center gap-2" role="alert">
+    <i class="bi bi-check-circle-fill"></i>
+    <div><%= flash %></div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+<% } %>
+
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-4">
+    <div class="stat-card red h-100">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <div class="num"><%= overdueCount %></div>
+          <div class="label">Overdue</div>
+        </div>
+        <i class="bi bi-exclamation-triangle-fill fs-2" style="color:var(--red); opacity:.8;"></i>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="stat-card amber h-100">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <div class="num"><%= dueSoonCount %></div>
+          <div class="label">Due within 7 days</div>
+        </div>
+        <i class="bi bi-clock-fill fs-2" style="color:var(--amber); opacity:.8;"></i>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="stat-card h-100">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <div class="num"><%= totalCount %></div>
+          <div class="label">Total equipment tracked</div>
+        </div>
+        <i class="bi bi-box-seam fs-2" style="color:var(--navy); opacity:.8;"></i>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="actions-row">
+  <div></div>
+  <div>
+    <a href="/customers" class="btn secondary"><i class="bi bi-people"></i> Manage Customers</a>
+    <a href="/notifications" class="btn secondary"><i class="bi bi-bell"></i> Notification Log</a>
+    <form method="POST" action="/notify-now" style="display:inline">
+      <button type="submit" class="btn secondary"><i class="bi bi-send"></i> Send Reminders Now</button>
+    </form>
+    <a href="/equipment/new" class="btn gold"><i class="bi bi-plus-lg"></i> Add Equipment</a>
+  </div>
+</div>
+
+<%- include('partials/searchbar') %>
+
+<% if (equipment.length === 0) { %>
+  <div class="empty-state">
+    No equipment yet. <a href="/customers/new">Add a customer</a> first, then <a href="/equipment/new">add their equipment</a>.
+  </div>
+<% } else { %>
+
+<!-- Instant, client-side filter of the table below (separate from the server-side serial-number search above) -->
+<div class="input-group mb-3" style="max-width: 420px;">
+  <span class="input-group-text bg-white"><i class="bi bi-funnel"></i></span>
+  <input type="text" id="quickFilter" class="form-control" placeholder="Quick filter this table…">
+</div>
+
+<table id="dashboardTable">
+  <thead>
+    <tr>
+      <th data-sort="text">Customer <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th data-sort="text">Equipment Type <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th data-sort="text">Brand <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th data-sort="text">Model <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th data-sort="text">Serial No. <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th data-sort="date">Last Calibration <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th data-sort="date">Next Calibration <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% equipment.forEach(e => { %>
+      <tr>
+        <td><%= e.customer_name %><br><span class="hint"><%= e.customer_phone || '' %></span></td>
+        <td><%= e.equipment_type || '—' %></td>
+        <td><%= e.brand || '—' %></td>
+        <td><%= e.model || '—' %></td>
+        <td><%= e.serial_number || '—' %></td>
+        <td data-sort-value="<%= e.last_calibration_date || '' %>"><%= e.last_calibration_date || '—' %></td>
+        <td data-sort-value="<%= e.next_calibration_date || '' %>">
+          <%= e.next_calibration_date || '—' %> <span class="badge <%= e.badge.className %>"><%= e.badge.label %></span>
+        </td>
+        <td class="text-nowrap">
+          <a href="/equipment/<%= e.id %>/view" class="btn small secondary" title="View"><i class="bi bi-eye"></i> View</a>
+          <a href="/equipment/<%= e.id %>/edit" class="btn small secondary" title="Edit"><i class="bi bi-pencil-square"></i> Edit</a>
+          <form method="POST" action="/equipment/<%= e.id %>/delete" style="display:inline"
+                onsubmit="return confirm('Delete this equipment and all its calibration records?');">
+            <button type="submit" class="btn small danger" title="Delete"><i class="bi bi-trash"></i> Delete</button>
+          </form>
+        </td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<div id="noResultsMsg" class="empty-state" style="display:none;">No rows match your filter.</div>
+<% } %>
+
+<script>
+  // ---- Instant client-side filter ----
+  const quickFilter = document.getElementById('quickFilter');
+  const dashboardTable = document.getElementById('dashboardTable');
+  const noResultsMsg = document.getElementById('noResultsMsg');
+
+  if (quickFilter && dashboardTable) {
+    const rows = Array.from(dashboardTable.querySelectorAll('tbody tr'));
+
+    quickFilter.addEventListener('input', () => {
+      const q = quickFilter.value.trim().toLowerCase();
+      let visibleCount = 0;
+      rows.forEach((row) => {
+        const matches = row.textContent.toLowerCase().includes(q);
+        row.style.display = matches ? '' : 'none';
+        if (matches) visibleCount++;
+      });
+      dashboardTable.style.display = visibleCount === 0 ? 'none' : '';
+      noResultsMsg.style.display = visibleCount === 0 ? 'block' : 'none';
+    });
+  }
+
+  // ---- Sortable columns ----
+  if (dashboardTable) {
+    const tbody = dashboardTable.querySelector('tbody');
+    const headers = dashboardTable.querySelectorAll('th[data-sort]');
+
+    headers.forEach((th, colIndex) => {
+      th.style.cursor = 'pointer';
+      let ascending = true;
+
+      th.addEventListener('click', () => {
+        const type = th.dataset.sort;
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+
+        rows.sort((a, b) => {
+          const cellA = a.children[colIndex];
+          const cellB = b.children[colIndex];
+          const valA = (cellA.dataset.sortValue !== undefined ? cellA.dataset.sortValue : cellA.textContent).trim();
+          const valB = (cellB.dataset.sortValue !== undefined ? cellB.dataset.sortValue : cellB.textContent).trim();
+
+          let cmp;
+          if (type === 'date') {
+            // Empty dates always sort to the end, regardless of direction
+            if (!valA && !valB) cmp = 0;
+            else if (!valA) cmp = 1;
+            else if (!valB) cmp = -1;
+            else cmp = new Date(valA) - new Date(valB);
+          } else {
+            cmp = valA.localeCompare(valB, undefined, { sensitivity: 'base' });
+          }
+          return ascending ? cmp : -cmp;
+        });
+
+        rows.forEach((row) => tbody.appendChild(row));
+        ascending = !ascending;
+      });
+    });
+  }
+
+  // ---- Auto-dismiss the success flash message after a few seconds ----
+  const flashAlert = document.getElementById('flashAlert');
+  if (flashAlert && window.bootstrap) {
+    setTimeout(() => {
+      const alertInstance = bootstrap.Alert.getOrCreateInstance(flashAlert);
+      alertInstance.close();
+    }, 5000);
+  }
+</script>
+
+<%- include('partials/footer') %>

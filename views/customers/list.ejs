@@ -1,0 +1,119 @@
+<%- include('../partials/header', { title: 'Customers — Calibration Tracker', username }) %>
+
+<h1>Customers</h1>
+<p class="subtitle">All client records.</p>
+
+<% if (typeof flash !== 'undefined' && flash) { %>
+  <div id="flashAlert" class="alert alert-success alert-dismissible fade show d-flex align-items-center gap-2" role="alert">
+    <i class="bi bi-check-circle-fill"></i>
+    <div><%= flash %></div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+<% } %>
+
+<div class="actions-row">
+  <div></div>
+  <a href="/customers/new" class="btn gold"><i class="bi bi-person-plus-fill"></i> Add Customer</a>
+</div>
+
+<%- include('../partials/searchbar') %>
+
+<% if (customers.length === 0) { %>
+  <div class="empty-state">No customers yet. <a href="/customers/new">Add your first one</a>.</div>
+<% } else { %>
+
+<!-- Instant, client-side filter of the table below (separate from the server-side serial-number search above) -->
+<div class="input-group mb-3" style="max-width: 420px;">
+  <span class="input-group-text bg-white"><i class="bi bi-funnel"></i></span>
+  <input type="text" id="quickFilter" class="form-control" placeholder="Quick filter this table…">
+</div>
+
+<table id="customersTable">
+  <thead>
+    <tr>
+      <th data-sort="text"><i class="bi bi-building"></i> Company Name <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th data-sort="text"><i class="bi bi-geo-alt"></i> Company Address <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th data-sort="text"><i class="bi bi-telephone"></i> Phone <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th data-sort="text"><i class="bi bi-envelope"></i> Email <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% customers.forEach(c => { %>
+      <tr>
+        <td><%= c.name %></td>
+        <td><%= c.company || '—' %></td>
+        <td><%= c.phone || '—' %></td>
+        <td><%= c.email || '—' %></td>
+        <td class="text-nowrap">
+          <a href="/customers/<%= c.id %>/edit" class="btn small secondary" title="Edit"><i class="bi bi-pencil-square"></i> Edit</a>
+          <form method="POST" action="/customers/<%= c.id %>/delete" style="display:inline"
+                onsubmit="return confirm('Delete this customer and all their equipment records?');">
+            <button type="submit" class="btn small danger" title="Delete"><i class="bi bi-trash"></i> Delete</button>
+          </form>
+        </td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<div id="noResultsMsg" class="empty-state" style="display:none;">No rows match your filter.</div>
+<% } %>
+
+<script>
+  // ---- Instant client-side filter ----
+  const quickFilter = document.getElementById('quickFilter');
+  const customersTable = document.getElementById('customersTable');
+  const noResultsMsg = document.getElementById('noResultsMsg');
+
+  if (quickFilter && customersTable) {
+    const rows = Array.from(customersTable.querySelectorAll('tbody tr'));
+
+    quickFilter.addEventListener('input', () => {
+      const q = quickFilter.value.trim().toLowerCase();
+      let visibleCount = 0;
+      rows.forEach((row) => {
+        const matches = row.textContent.toLowerCase().includes(q);
+        row.style.display = matches ? '' : 'none';
+        if (matches) visibleCount++;
+      });
+      customersTable.style.display = visibleCount === 0 ? 'none' : '';
+      noResultsMsg.style.display = visibleCount === 0 ? 'block' : 'none';
+    });
+  }
+
+  // ---- Sortable columns ----
+  if (customersTable) {
+    const tbody = customersTable.querySelector('tbody');
+    const headers = customersTable.querySelectorAll('th[data-sort]');
+
+    headers.forEach((th, colIndex) => {
+      th.style.cursor = 'pointer';
+      let ascending = true;
+
+      th.addEventListener('click', () => {
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+
+        rows.sort((a, b) => {
+          const valA = a.children[colIndex].textContent.trim();
+          const valB = b.children[colIndex].textContent.trim();
+          const cmp = valA.localeCompare(valB, undefined, { sensitivity: 'base' });
+          return ascending ? cmp : -cmp;
+        });
+
+        rows.forEach((row) => tbody.appendChild(row));
+        ascending = !ascending;
+      });
+    });
+  }
+
+  // ---- Auto-dismiss the success flash message after a few seconds ----
+  const flashAlert = document.getElementById('flashAlert');
+  if (flashAlert && window.bootstrap) {
+    setTimeout(() => {
+      const alertInstance = bootstrap.Alert.getOrCreateInstance(flashAlert);
+      alertInstance.close();
+    }, 5000);
+  }
+</script>
+
+<%- include('../partials/footer') %>

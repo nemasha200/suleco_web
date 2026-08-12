@@ -1,0 +1,221 @@
+<%- include('../partials/header', { title: 'Add Calibration', username }) %>
+
+<h1>Add Calibration</h1>
+<p class="subtitle">Search by serial number, then log this calibration for that equipment.</p>
+
+<% if (typeof flash !== 'undefined' && flash) { %>
+  <div class="empty-state" style="border-color:#2e7d32; color:#2e7d32;"><%= flash %></div>
+<% } %>
+
+<div class="card" style="max-width: 720px;">
+  <form method="POST" action="/calibrations/new" id="calibrationForm">
+
+    <!-- Serial number search-select -->
+    <div class="form-group combo-wrap">
+      <label>Serial Number *</label>
+      <input
+        type="text"
+        id="serialSearchInput"
+        placeholder="Type to search by serial number…"
+        autocomplete="off"
+        required
+      >
+      <input type="hidden" name="equipment_id" id="equipmentIdInput" required>
+      <div id="serialResults" class="combo-results"></div>
+      <div class="hint">No equipment yet? <a href="/equipment/new" target="_blank">Add equipment first</a>, then come back and search again.</div>
+    </div>
+
+    <!-- Auto-filled info, shown once a serial number is picked -->
+    <div id="equipmentInfoPanel" style="display:none; margin-bottom: 24px;">
+      <div style="background: #fff; border: 1px solid #E3E7EE; border-radius: 10px; padding: 18px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px 28px;">
+        <div>
+          <div class="hint" style="margin-bottom: 3px;">Company Name</div>
+          <div id="infoCompanyName" style="font-weight: 600; font-size: 15px;">—</div>
+        </div>
+        <div>
+          <div class="hint" style="margin-bottom: 3px;">Equipment</div>
+          <div id="infoEquipmentLabel" style="font-weight: 600; font-size: 15px;">—</div>
+        </div>
+        <div>
+          <div class="hint" style="margin-bottom: 3px;">Sold By Us</div>
+          <div id="infoSoldByUs" style="font-weight: 600; font-size: 15px;">—</div>
+        </div>
+        <div>
+          <div class="hint" style="margin-bottom: 3px;">Purchase Date</div>
+          <div id="infoPurchaseDate" style="font-weight: 600; font-size: 15px;">—</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 14px;">
+        <div class="hint" style="margin-bottom: 8px;">Calibration History</div>
+        <div id="infoDoneDates" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+      </div>
+    </div>
+
+    <hr class="form-divider">
+
+    <!-- Calibration status -->
+    <div class="form-group">
+      <label>Calibration Description *</label>
+      <select name="description" required>
+        <option value="">Select…</option>
+        <% descriptionOptions.forEach(d => { %>
+          <option value="<%= d %>"><%= d %></option>
+        <% }) %>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Calibration Done? *</label>
+      <div class="radio-group">
+        <label class="radio-option">
+          <input type="radio" name="done" value="Yes" required>
+          Done
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="done" value="No" checked>
+          Not
+        </label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Repair? *</label>
+      <div class="radio-group">
+        <label class="radio-option">
+          <input type="radio" name="repair" value="Yes" data-repair-radio required>
+          Yes
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="repair" value="No" data-repair-radio checked>
+          No
+        </label>
+      </div>
+    </div>
+
+    <div id="repairFields" style="display:none;">
+      <div class="form-group">
+        <label>Spare Part Replacement</label>
+        <input type="text" name="spare_part_replacement" placeholder="e.g. Compensator, Focus lens…">
+      </div>
+      <div class="form-group">
+        <label>Description of Repair</label>
+        <input type="text" name="repair_description" placeholder="Describe the repair carried out…">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Status</label>
+      <input type="text" name="status" placeholder="e.g. Passed, Needs parts, Sent for repair…">
+    </div>
+
+    <div class="form-group">
+      <label>Done Date</label>
+      <input type="date" name="done_date" id="doneDateInput">
+    </div>
+
+    <button type="submit" class="btn" style="margin-top: 8px;">Save Calibration</button>
+    <a href="/calibrations" class="btn secondary">Cancel</a>
+  </form>
+</div>
+
+<script>
+  const EQUIPMENT_LIST = <%- JSON.stringify(equipmentList) %>;
+  const DONE_DATES_BY_EQUIPMENT = <%- JSON.stringify(doneDatesByEquipment) %>;
+
+  const searchInput = document.getElementById('serialSearchInput');
+  const idInput = document.getElementById('equipmentIdInput');
+  const resultsBox = document.getElementById('serialResults');
+  const infoPanel = document.getElementById('equipmentInfoPanel');
+  const infoCompanyName = document.getElementById('infoCompanyName');
+  const infoEquipmentLabel = document.getElementById('infoEquipmentLabel');
+  const infoSoldByUs = document.getElementById('infoSoldByUs');
+  const infoPurchaseDate = document.getElementById('infoPurchaseDate');
+  const infoDoneDates = document.getElementById('infoDoneDates');
+
+  // Only append the company if it's actually different text from the name
+  // (avoids "Lal Constructions — Lal Constructions" when they're the same).
+  function companyLabel(e) {
+    if (e.customer_company && e.customer_company.trim() && e.customer_company.trim() !== (e.customer_name || '').trim()) {
+      return `${e.customer_name} — ${e.customer_company}`;
+    }
+    return e.customer_name || '—';
+  }
+
+  function equipmentLabel(e) {
+    return [e.brand, e.equipment_type].filter(Boolean).join(' ') || '—';
+  }
+
+  function labelFor(e) {
+    return `${e.serial_number} (${equipmentLabel(e)}) — ${companyLabel(e)}`;
+  }
+
+  function renderResults(list) {
+    if (list.length === 0) {
+      resultsBox.innerHTML = '<div class="combo-empty">No matching equipment</div>';
+      resultsBox.style.display = 'block';
+      return;
+    }
+    resultsBox.innerHTML = list.map(e =>
+      `<div class="combo-item" data-id="${e.id}">
+        <strong>${e.serial_number || '—'}</strong> — ${equipmentLabel(e)}<br>
+        <span class="hint">${companyLabel(e)}</span>
+      </div>`
+    ).join('');
+    resultsBox.style.display = 'block';
+  }
+
+  searchInput.addEventListener('focus', () => {
+    renderResults(EQUIPMENT_LIST);
+  });
+
+  searchInput.addEventListener('input', () => {
+    idInput.value = '';
+    infoPanel.style.display = 'none';
+    const q = searchInput.value.trim().toLowerCase();
+    const filtered = EQUIPMENT_LIST.filter(e =>
+      (e.serial_number || '').toLowerCase().includes(q) ||
+      (e.customer_name || '').toLowerCase().includes(q)
+    );
+    renderResults(filtered);
+  });
+
+  resultsBox.addEventListener('click', (e) => {
+    const item = e.target.closest('.combo-item');
+    if (!item) return;
+    const equipment = EQUIPMENT_LIST.find(eq => String(eq.id) === item.dataset.id);
+    if (!equipment) return;
+
+    idInput.value = equipment.id;
+    searchInput.value = labelFor(equipment);
+    resultsBox.style.display = 'none';
+
+    // auto-fill the info panel
+    infoCompanyName.textContent = companyLabel(equipment);
+    infoEquipmentLabel.textContent = equipmentLabel(equipment);
+    infoSoldByUs.textContent = equipment.sold_by_us || 'No';
+    infoPurchaseDate.textContent = equipment.purchase_date || '—';
+
+    const history = DONE_DATES_BY_EQUIPMENT[equipment.id] || [];
+    infoDoneDates.innerHTML = history.length
+      ? history.map(d => `<span class="badge badge-grey">${d}</span>`).join('')
+      : '<span class="hint">No previous calibrations yet</span>';
+
+    infoPanel.style.display = 'block';
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.combo-wrap')) resultsBox.style.display = 'none';
+  });
+
+  // ---- Repair? toggle ----
+  const repairFields = document.getElementById('repairFields');
+  document.querySelectorAll('[data-repair-radio]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      const yesChecked = document.querySelector('[data-repair-radio][value="Yes"]').checked;
+      repairFields.style.display = yesChecked ? 'block' : 'none';
+    });
+  });
+</script>
+
+<%- include('../partials/footer') %>

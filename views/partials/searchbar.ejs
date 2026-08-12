@@ -1,0 +1,12 @@
+<div class="table-search-row">
+  <form method="GET" action="/search" class="topbar-search table-search">
+    <input
+      type="text"
+      name="q"
+      placeholder="Search serial number…"
+      value="<%= typeof q !== 'undefined' ? q : '' %>"
+      autocomplete="off"
+    >
+    <button type="submit" aria-label="Search">Search</button>
+  </form>
+</div>

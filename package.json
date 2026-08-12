@@ -1,0 +1,19 @@
+{
+  "name": "calibration-tracker",
+  "version": "1.0.0",
+  "description": "Simple calibration tracking web app - admin panel for customers, equipment, and 6-month calibration due dates",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.15"
+  }
+}

@@ -1,0 +1,144 @@
+<%- include('../partials/header', { title: 'Calibrations', username }) %>
+
+<h1>Calibrations</h1>
+<p class="subtitle">All logged calibration records.</p>
+
+<% if (typeof flash !== 'undefined' && flash) { %>
+  <div id="flashAlert" class="alert alert-success alert-dismissible fade show d-flex align-items-center gap-2" role="alert">
+    <i class="bi bi-check-circle-fill"></i>
+    <div><%= flash %></div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+<% } %>
+
+<div class="actions-row">
+  <div></div>
+  <div>
+    <a href="/calibrations/new" class="btn gold"><i class="bi bi-plus-lg"></i> Add Calibration</a>
+  </div>
+</div>
+
+<%- include('../partials/searchbar') %>
+
+<% if (calibrations.length === 0) { %>
+  <div class="empty-state">
+    No calibration records yet. <a href="/calibrations/new">Add one</a>.
+  </div>
+<% } else { %>
+
+<!-- Instant, client-side filter of the table below (separate from the server-side serial-number search above) -->
+<div class="input-group mb-3" style="max-width: 420px;">
+  <span class="input-group-text bg-white"><i class="bi bi-funnel"></i></span>
+  <input type="text" id="quickFilter" class="form-control" placeholder="Quick filter this table…">
+</div>
+
+<table id="calibrationsTable">
+  <thead>
+    <tr>
+      <th data-sort="text">Customer <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th data-sort="text">Equipment Type <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th data-sort="text">Serial No. <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th data-sort="text">Description <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th data-sort="text">Done? <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th data-sort="text">Status <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th data-sort="date">Done Date <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% calibrations.forEach(c => { %>
+      <tr>
+        <td><%= c.customer_name %></td>
+        <td><%= c.equipment_type || '—' %></td>
+        <td><%= c.serial_number || '—' %></td>
+        <td><%= c.description || '—' %></td>
+        <td>
+          <span class="badge <%= c.done === 'Yes' ? 'badge-green' : 'badge-grey' %>">
+            <i class="bi <%= c.done === 'Yes' ? 'bi-check-circle' : 'bi-dash-circle' %>"></i> <%= c.done %>
+          </span>
+        </td>
+        <td><%= c.status || '—' %></td>
+        <td data-sort-value="<%= c.done_date || '' %>"><%= c.done_date || '—' %></td>
+        <td class="text-nowrap">
+          <a href="/calibrations/<%= c.id %>/edit" class="btn small secondary" title="Edit"><i class="bi bi-pencil-square"></i> Edit</a>
+          <form method="POST" action="/calibrations/<%= c.id %>/delete" style="display:inline" onsubmit="return confirm('Delete this calibration record?');">
+            <button type="submit" class="btn small danger" title="Delete"><i class="bi bi-trash"></i> Delete</button>
+          </form>
+        </td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<div id="noResultsMsg" class="empty-state" style="display:none;">No rows match your filter.</div>
+<% } %>
+
+<script>
+  // ---- Instant client-side filter ----
+  const quickFilter = document.getElementById('quickFilter');
+  const calibrationsTable = document.getElementById('calibrationsTable');
+  const noResultsMsg = document.getElementById('noResultsMsg');
+
+  if (quickFilter && calibrationsTable) {
+    const rows = Array.from(calibrationsTable.querySelectorAll('tbody tr'));
+
+    quickFilter.addEventListener('input', () => {
+      const q = quickFilter.value.trim().toLowerCase();
+      let visibleCount = 0;
+      rows.forEach((row) => {
+        const matches = row.textContent.toLowerCase().includes(q);
+        row.style.display = matches ? '' : 'none';
+        if (matches) visibleCount++;
+      });
+      calibrationsTable.style.display = visibleCount === 0 ? 'none' : '';
+      noResultsMsg.style.display = visibleCount === 0 ? 'block' : 'none';
+    });
+  }
+
+  // ---- Sortable columns ----
+  if (calibrationsTable) {
+    const tbody = calibrationsTable.querySelector('tbody');
+    const headers = calibrationsTable.querySelectorAll('th[data-sort]');
+
+    headers.forEach((th, colIndex) => {
+      th.style.cursor = 'pointer';
+      let ascending = true;
+
+      th.addEventListener('click', () => {
+        const type = th.dataset.sort;
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+
+        rows.sort((a, b) => {
+          const cellA = a.children[colIndex];
+          const cellB = b.children[colIndex];
+          const valA = (cellA.dataset.sortValue !== undefined ? cellA.dataset.sortValue : cellA.textContent).trim();
+          const valB = (cellB.dataset.sortValue !== undefined ? cellB.dataset.sortValue : cellB.textContent).trim();
+
+          let cmp;
+          if (type === 'date') {
+            if (!valA && !valB) cmp = 0;
+            else if (!valA) cmp = 1;
+            else if (!valB) cmp = -1;
+            else cmp = new Date(valA) - new Date(valB);
+          } else {
+            cmp = valA.localeCompare(valB, undefined, { sensitivity: 'base' });
+          }
+          return ascending ? cmp : -cmp;
+        });
+
+        rows.forEach((row) => tbody.appendChild(row));
+        ascending = !ascending;
+      });
+    });
+  }
+
+  // ---- Auto-dismiss the success flash message after a few seconds ----
+  const flashAlert = document.getElementById('flashAlert');
+  if (flashAlert && window.bootstrap) {
+    setTimeout(() => {
+      const alertInstance = bootstrap.Alert.getOrCreateInstance(flashAlert);
+      alertInstance.close();
+    }, 5000);
+  }
+</script>
+
+<%- include('../partials/footer') %>

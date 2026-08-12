@@ -1,0 +1,265 @@
+<%- include('../partials/header', { title: (equipment ? 'Edit' : 'Add') + ' Equipment', username }) %>
+
+<h1><%= equipment ? 'Edit Equipment' : 'Add Equipment' %></h1>
+<p class="subtitle">
+  <% if (equipment) { %>
+    Update this equipment's details below.
+  <% } else { %>
+    Search for the customer, then add every equipment item they're purchasing in one go.
+  <% } %>
+</p>
+
+<div class="card" style="max-width: 720px;">
+  <div class="d-flex align-items-center gap-2 mb-3 pb-3" style="border-bottom: 1px solid #E3E7EE;">
+    <i class="bi bi-box-seam fs-4" style="color:var(--gold);"></i>
+    <span style="font-weight:700; color:var(--navy);"><%= equipment ? 'Equipment Details' : 'New Equipment Item(s)' %></span>
+  </div>
+  <form method="POST" action="<%= equipment ? '/equipment/' + equipment.id + '/edit' : '/equipment/new' %>" id="equipmentForm">
+
+    <!-- Customer search-select -->
+    <div class="form-group combo-wrap">
+      <label><i class="bi bi-person-fill" style="color:var(--gold);"></i> Customer *</label>
+      <input
+        type="text"
+        id="customerSearchInput"
+        placeholder="Type to search customers…"
+        autocomplete="off"
+        value="<%= equipment ? (customers.find(c => c.id === equipment.customer_id) ? customers.find(c => c.id === equipment.customer_id).name + (customers.find(c => c.id === equipment.customer_id).company ? ' — ' + customers.find(c => c.id === equipment.customer_id).company : '') : '') : '' %>"
+        required
+      >
+      <input type="hidden" name="customer_id" id="customerIdInput" value="<%= equipment ? equipment.customer_id : '' %>" required>
+      <div id="customerResults" class="combo-results"></div>
+      <div class="hint">No customer yet? <a href="/customers/new" target="_blank">Add one first</a>, then come back and search again.</div>
+    </div>
+
+    <hr class="form-divider">
+
+    <!-- Equipment rows -->
+    <div id="equipmentRows">
+      <% const firstType = equipment ? equipment.equipment_type : ''; %>
+      <% const firstBrand = equipment ? equipment.brand : ''; %>
+      <% const firstModel = equipment ? equipment.model : ''; %>
+      <% const firstSerial = equipment ? equipment.serial_number : ''; %>
+      <% const firstSoldByUs = equipment ? equipment.sold_by_us : ''; %>
+      <% const firstPurchaseDate = equipment ? (equipment.purchase_date || '') : ''; %>
+      <% const firstWarranty = equipment ? Number(equipment.warranty_period_months) : ''; %>
+
+      <div class="equipment-row" data-row data-row-index="0">
+        <div class="equipment-row-grid">
+          <div class="form-group option-field" data-option-field>
+            <label><i class="bi bi-tools" style="color:var(--gold);"></i> Equipment Type *</label>
+            <select name="equipment_type[]" class="option-select" required>
+              <option value="">Select type…</option>
+              <% equipmentTypes.forEach(t => { %>
+                <option value="<%= t %>" <%= firstType === t ? 'selected' : '' %>><%= t %></option>
+              <% }) %>
+              <option value="__new__">+ Add new type…</option>
+            </select>
+            <input type="text" name="equipment_type_new[]" class="option-new-input" style="display:none; margin-top:6px;" placeholder="Type new equipment type">
+          </div>
+          <div class="form-group option-field" data-option-field>
+            <label><i class="bi bi-tag-fill" style="color:var(--gold);"></i> Brand *</label>
+            <select name="brand[]" class="option-select" required>
+              <option value="">Select brand…</option>
+              <% brands.forEach(b => { %>
+                <option value="<%= b %>" <%= firstBrand === b ? 'selected' : '' %>><%= b %></option>
+              <% }) %>
+              <option value="__new__">+ Add new brand…</option>
+            </select>
+            <input type="text" name="brand_new[]" class="option-new-input" style="display:none; margin-top:6px;" placeholder="Type new brand">
+          </div>
+          <div class="form-group option-field" data-option-field>
+            <label><i class="bi bi-upc-scan" style="color:var(--gold);"></i> Model *</label>
+            <select name="model[]" class="option-select" required>
+              <option value="">Select model…</option>
+              <% models.forEach(m => { %>
+                <option value="<%= m %>" <%= firstModel === m ? 'selected' : '' %>><%= m %></option>
+              <% }) %>
+              <option value="__new__">+ Add new model…</option>
+            </select>
+            <input type="text" name="model_new[]" class="option-new-input" style="display:none; margin-top:6px;" placeholder="Type new model">
+          </div>
+          <div class="form-group">
+            <label><i class="bi bi-hash" style="color:var(--gold);"></i> Serial Number *</label>
+            <input type="text" name="serial_number[]" value="<%= firstSerial %>" placeholder="e.g. WP193069" required>
+          </div>
+          <% if (!equipment) { %>
+          <div class="row-remove-wrap">
+            <button type="button" class="row-remove-btn" onclick="removeRow(this)" title="Remove this item"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <% } %>
+        </div>
+
+        <!-- Per-item Sold By Us + warranty -->
+        <div class="form-group">
+          <label><i class="bi bi-shop" style="color:var(--gold);"></i> Sold By Us? *</label>
+          <div class="radio-group" data-sold-group>
+            <label class="radio-option">
+              <input type="radio" name="sold_by_us_group_0" value="Yes" data-sold-radio <%= firstSoldByUs === 'Yes' ? 'checked' : '' %> required>
+              Yes
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="sold_by_us_group_0" value="No" data-sold-radio <%= firstSoldByUs !== 'Yes' ? 'checked' : '' %>>
+              No
+            </label>
+          </div>
+          <input type="hidden" name="sold_by_us[]" data-sold-hidden value="<%= firstSoldByUs === 'Yes' ? 'Yes' : 'No' %>">
+        </div>
+
+        <div class="row-warranty-fields" data-warranty-fields style="display: <%= firstSoldByUs === 'Yes' ? 'block' : 'none' %>;">
+          <div class="form-group">
+            <label><i class="bi bi-calendar-event" style="color:var(--gold);"></i> Purchase Date</label>
+            <input type="date" name="purchase_date[]" value="<%= firstPurchaseDate %>">
+          </div>
+          <div class="form-group">
+            <label><i class="bi bi-shield-check" style="color:var(--gold);"></i> Warranty Period</label>
+            <select name="warranty_period_months[]">
+              <option value="">Select warranty period…</option>
+              <% warrantyOptions.forEach(w => { %>
+                <option value="<%= w %>" <%= firstWarranty === w ? 'selected' : '' %>><%= w %> months</option>
+              <% }) %>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <% if (!equipment) { %>
+      <button type="button" class="btn secondary" id="addRowBtn" style="margin-bottom: 20px;"><i class="bi bi-plus-lg"></i> Add Another Equipment Item</button>
+    <% } %>
+
+    <hr class="form-divider">
+
+    <button type="submit" class="btn" style="margin-top: 8px;"><i class="bi bi-check-lg"></i> <%= equipment ? 'Save Changes' : 'Save Equipment' %></button>
+    <a href="/" class="btn secondary"><i class="bi bi-x-lg"></i> Cancel</a>
+  </form>
+</div>
+
+<script>
+  // ---- Customer search combo ----
+  const CUSTOMERS = <%- JSON.stringify(customers) %>;
+  const searchInput = document.getElementById('customerSearchInput');
+  const idInput = document.getElementById('customerIdInput');
+  const resultsBox = document.getElementById('customerResults');
+
+  function renderResults(list) {
+    if (list.length === 0) {
+      resultsBox.innerHTML = '<div class="combo-empty">No matching customers</div>';
+      resultsBox.style.display = 'block';
+      return;
+    }
+    resultsBox.innerHTML = list.map(c =>
+      `<div class="combo-item" data-id="${c.id}" data-label="${(c.name + (c.company ? ' — ' + c.company : '')).replace(/"/g, '&quot;')}">
+        <strong>${c.name}</strong>${c.company ? ' — ' + c.company : ''}
+      </div>`
+    ).join('');
+    resultsBox.style.display = 'block';
+  }
+
+  searchInput.addEventListener('focus', () => {
+    renderResults(CUSTOMERS);
+  });
+
+  searchInput.addEventListener('input', () => {
+    idInput.value = ''; // typing invalidates any previously selected id until they pick again
+    const q = searchInput.value.trim().toLowerCase();
+    const filtered = CUSTOMERS.filter(c =>
+      c.name.toLowerCase().includes(q) || (c.company || '').toLowerCase().includes(q)
+    );
+    renderResults(filtered);
+  });
+
+  resultsBox.addEventListener('click', (e) => {
+    const item = e.target.closest('.combo-item');
+    if (!item) return;
+    idInput.value = item.dataset.id;
+    searchInput.value = item.dataset.label;
+    resultsBox.style.display = 'none';
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.combo-wrap')) resultsBox.style.display = 'none';
+  });
+
+  // ---- Dynamic equipment rows (Add mode only) ----
+  const rowsWrap = document.getElementById('equipmentRows');
+  const addRowBtn = document.getElementById('addRowBtn');
+  let rowCounter = 1; // row 0 already exists in the markup
+
+  if (addRowBtn) {
+    addRowBtn.addEventListener('click', () => {
+      const template = rowsWrap.querySelector('[data-row]').cloneNode(true);
+      const newIndex = rowCounter++;
+
+      template.setAttribute('data-row-index', newIndex);
+
+      template.querySelectorAll('input, select').forEach(el => {
+        if (el.classList.contains('option-new-input')) {
+          el.style.display = 'none';
+          el.required = false;
+          el.value = '';
+        } else if (el.tagName === 'SELECT') {
+          el.selectedIndex = 0;
+        } else if (el.type === 'radio') {
+          // give this row's radios their own group name so toggling one
+          // row never affects another row's selection
+          el.name = 'sold_by_us_group_' + newIndex;
+          el.checked = (el.value === 'No');
+        } else if (el.type === 'hidden') {
+          el.value = 'No';
+        } else {
+          el.value = '';
+        }
+      });
+
+      // reset this row's warranty visibility to hidden (defaults to "No")
+      const warrantyBox = template.querySelector('[data-warranty-fields]');
+      if (warrantyBox) warrantyBox.style.display = 'none';
+
+      rowsWrap.appendChild(template);
+    });
+  }
+
+  function removeRow(btn) {
+    const rows = rowsWrap.querySelectorAll('[data-row]');
+    if (rows.length <= 1) return; // always keep at least one row
+    btn.closest('[data-row]').remove();
+  }
+
+  // ---- Per-item Sold By Us toggle, and "+ Add new…" option reveal ----
+  // Delegated listener so it works for rows added dynamically too.
+  rowsWrap.addEventListener('change', (e) => {
+    if (e.target.matches('.option-select')) {
+      const wrap = e.target.closest('[data-option-field]');
+      const newInput = wrap.querySelector('.option-new-input');
+      if (e.target.value === '__new__') {
+        newInput.style.display = 'block';
+        newInput.required = true;
+        newInput.value = '';
+        newInput.focus();
+      } else {
+        newInput.style.display = 'none';
+        newInput.required = false;
+        newInput.value = '';
+      }
+    }
+
+    if (e.target.matches('[data-sold-radio]')) {
+      updateRowSoldState(e.target.closest('[data-row]'));
+    }
+  });
+
+  function updateRowSoldState(row) {
+    const selected = row.querySelector('[data-sold-radio]:checked');
+    const isYes = !!selected && selected.value === 'Yes';
+    const hidden = row.querySelector('[data-sold-hidden]');
+    const warrantyBox = row.querySelector('[data-warranty-fields]');
+    if (hidden) hidden.value = isYes ? 'Yes' : 'No';
+    if (warrantyBox) warrantyBox.style.display = isYes ? 'block' : 'none';
+  }
+
+  // run once on load for every existing row (handles edit mode prefill)
+  rowsWrap.querySelectorAll('[data-row]').forEach(updateRowSoldState);
+</script>
+
+<%- include('../partials/footer') %>

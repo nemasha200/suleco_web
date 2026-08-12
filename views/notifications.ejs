@@ -1,0 +1,102 @@
+<%- include('partials/header', { title: 'Notification Log — Calibration Tracker', username }) %>
+
+<h1>Notification Log</h1>
+<p class="subtitle">Most recent 200 reminder attempts (email and SMS).</p>
+
+<div class="actions-row">
+  <div></div>
+  <div>
+    <a href="/" class="btn secondary">Back to Dashboard</a>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+  <div class="hint" style="margin-bottom: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; font-size: 12px;">
+    Send Test Notification
+  </div>
+  <p class="hint" style="margin-bottom: 14px;">
+    Enter an email and/or phone number to send a one-off test message right now, and confirm below whether it actually went out.
+  </p>
+  <form method="POST" action="/notifications/test" style="display:grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end;">
+    <div class="form-group" style="margin: 0;">
+      <label>Test Email</label>
+      <input type="email" name="test_email" placeholder="you@example.com">
+    </div>
+    <div class="form-group" style="margin: 0;">
+      <label>Test Phone</label>
+      <input type="text" name="test_phone" placeholder="e.g. 0771234567">
+    </div>
+    <button type="submit" class="btn gold" style="height: 38px;">Send Test</button>
+  </form>
+
+  <% if (typeof testResults !== 'undefined' && testResults && testResults.length > 0) { %>
+    <div style="margin-top: 18px;">
+      <div class="hint" style="margin-bottom: 8px;">Result</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Channel</th>
+            <th>Target</th>
+            <th>Status</th>
+            <th>Detail</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% testResults.forEach(r => { %>
+            <tr>
+              <td><%= r.channel %></td>
+              <td><%= r.target %></td>
+              <td>
+                <span class="badge <%= r.status.startsWith('sent') ? 'badge-green' : (r.status === 'failed' ? 'badge-red' : 'badge-grey') %>">
+                  <%= r.status %>
+                </span>
+              </td>
+              <td>
+                <% if (r.detail && r.detail.startsWith('http')) { %>
+                  <a href="<%= r.detail %>" target="_blank" rel="noopener">View test email preview</a>
+                <% } else { %>
+                  <%= r.detail || '—' %>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<% if (logs.length === 0) { %>
+  <div class="empty-state">No notifications have been sent yet.</div>
+<% } else { %>
+<table>
+  <thead>
+    <tr>
+      <th>Sent At</th>
+      <th>Customer</th>
+      <th>Channel</th>
+      <th>Target</th>
+      <th>Status</th>
+      <th>Detail</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% logs.forEach(l => { %>
+      <tr>
+        <td><%= l.sent_at %></td>
+        <td><%= l.customer_name %></td>
+        <td><%= l.channel %></td>
+        <td><%= l.target || '—' %></td>
+        <td>
+          <span class="badge <%= l.status === 'sent' ? 'badge-green' : (l.status === 'failed' ? 'badge-red' : 'badge-grey') %>">
+            <%= l.status %>
+          </span>
+        </td>
+        <td><%= l.detail || '—' %></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<% } %>
+
+<%- include('partials/footer') %>

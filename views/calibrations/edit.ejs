@@ -1,0 +1,101 @@
+<%- include('../partials/header', { title: 'Edit Calibration', username }) %>
+
+<h1>Edit Calibration</h1>
+<p class="subtitle"><%= calibration.serial_number || '—' %> — <%= calibration.customer_name %></p>
+
+<div class="card" style="max-width: 720px;">
+  <form method="POST" action="/calibrations/<%= calibration.id %>/edit">
+
+    <div style="background: #fff; border: 1px solid #E3E7EE; border-radius: 10px; padding: 18px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px 28px; margin-bottom: 24px;">
+      <div>
+        <div class="hint" style="margin-bottom: 3px;">Company Name</div>
+        <div style="font-weight: 600; font-size: 15px;"><%= calibration.customer_name %></div>
+      </div>
+      <div>
+        <div class="hint" style="margin-bottom: 3px;">Equipment</div>
+        <div style="font-weight: 600; font-size: 15px;"><%= [calibration.brand, calibration.equipment_type].filter(Boolean).join(' ') || '—' %></div>
+      </div>
+      <div>
+        <div class="hint" style="margin-bottom: 3px;">Serial Number</div>
+        <div style="font-weight: 600; font-size: 15px;"><%= calibration.serial_number || '—' %></div>
+      </div>
+    </div>
+
+    <hr class="form-divider">
+
+    <div class="form-group">
+      <label>Calibration Description *</label>
+      <select name="description" required>
+        <option value="">Select…</option>
+        <% descriptionOptions.forEach(d => { %>
+          <option value="<%= d %>" <%= calibration.description === d ? 'selected' : '' %>><%= d %></option>
+        <% }) %>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Calibration Done? *</label>
+      <div class="radio-group">
+        <label class="radio-option">
+          <input type="radio" name="done" value="Yes" <%= calibration.done === 'Yes' ? 'checked' : '' %> required>
+          Done
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="done" value="No" <%= calibration.done !== 'Yes' ? 'checked' : '' %>>
+          Not
+        </label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Repair? *</label>
+      <div class="radio-group">
+        <label class="radio-option">
+          <input type="radio" name="repair" value="Yes" data-repair-radio <%= calibration.repair === 'Yes' ? 'checked' : '' %> required>
+          Yes
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="repair" value="No" data-repair-radio <%= calibration.repair !== 'Yes' ? 'checked' : '' %>>
+          No
+        </label>
+      </div>
+    </div>
+
+    <div id="repairFields" style="display: <%= calibration.repair === 'Yes' ? 'block' : 'none' %>;">
+      <div class="form-group">
+        <label>Spare Part Replacement</label>
+        <input type="text" name="spare_part_replacement" value="<%= calibration.spare_part_replacement || '' %>" placeholder="e.g. Compensator, Focus lens…">
+      </div>
+      <div class="form-group">
+        <label>Description of Repair</label>
+        <input type="text" name="repair_description" value="<%= calibration.repair_description || '' %>" placeholder="Describe the repair carried out…">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Status</label>
+      <input type="text" name="status" value="<%= calibration.status || '' %>" placeholder="e.g. Passed, Needs parts, Sent for repair…">
+    </div>
+
+    <div class="form-group">
+      <label>Done Date</label>
+      <input type="date" name="done_date" value="<%= calibration.done_date || '' %>">
+    </div>
+
+    <button type="submit" class="btn" style="margin-top: 8px;">Save Changes</button>
+    <a href="/calibrations" class="btn secondary">Cancel</a>
+  </form>
+</div>
+
+<script>
+  // ---- Repair? toggle ----
+  const repairFields = document.getElementById('repairFields');
+  document.querySelectorAll('[data-repair-radio]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      const yesChecked = document.querySelector('[data-repair-radio][value="Yes"]').checked;
+      repairFields.style.display = yesChecked ? 'block' : 'none';
+    });
+  });
+</script>
+
+<%- include('../partials/footer') %>

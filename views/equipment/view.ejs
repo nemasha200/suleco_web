@@ -1,0 +1,124 @@
+<%- include('../partials/header', { title: 'Equipment Details', username }) %>
+
+<div style="margin-bottom: 8px;">
+  <a href="/" class="hint" style="font-size: 13px;">&larr; Back to Dashboard</a>
+</div>
+
+<h1><%= equipment.serial_number || 'Equipment' %></h1>
+<p class="subtitle"><%= equipment.brand || '—' %> <%= equipment.equipment_type || '' %> &middot; <%= equipment.customer_name %></p>
+
+<div class="actions-row">
+  <div></div>
+  <div>
+    <a href="/equipment/<%= equipment.id %>/edit" class="btn secondary">Edit Equipment</a>
+    <form method="POST" action="/equipment/<%= equipment.id %>/mark-done" style="display:inline">
+      <button type="submit" class="btn secondary">Mark Done Today</button>
+    </form>
+    <a href="/calibrations/new" class="btn gold">+ Add Calibration</a>
+  </div>
+</div>
+
+<div class="detail-card">
+  <div class="detail-card-title">Company/Client Deatils</div>
+  <div class="detail-grid">
+    <div>
+      <div class="detail-label">Customer Name/Client Name</div>
+      <div class="detail-value"><%= equipment.customer_name %></div>
+    </div>
+    <div>
+      <div class="detail-label">Company Address</div>
+      <div class="detail-value"><%= equipment.customer_company || '—' %></div>
+    </div>
+    <div>
+      <div class="detail-label">Phone</div>
+      <div class="detail-value"><%= equipment.customer_phone || '—' %></div>
+    </div>
+    <div>
+      <div class="detail-label">Email</div>
+      <div class="detail-value"><%= equipment.customer_email || '—' %></div>
+    </div>
+  </div>
+</div>
+
+<div class="detail-card">
+  <div class="detail-card-title">Equipment Details</div>
+  <div class="detail-grid">
+    <div>
+      <div class="detail-label">Equipment Type</div>
+      <div class="detail-value"><%= equipment.equipment_type || '—' %></div>
+    </div>
+    <div>
+      <div class="detail-label">Brand</div>
+      <div class="detail-value"><%= equipment.brand || '—' %></div>
+    </div>
+    <div>
+      <div class="detail-label">Model</div>
+      <div class="detail-value"><%= equipment.model || '—' %></div>
+    </div>
+    <div>
+      <div class="detail-label">Serial Number</div>
+      <div class="detail-value"><%= equipment.serial_number || '—' %></div>
+    </div>
+    <div>
+      <div class="detail-label">Status</div>
+      <div class="detail-value">
+        <span class="badge badge-grey"><%= equipment.status || '—' %></span>
+      </div>
+    </div>
+    <div>
+      <div class="detail-label">Last Calibration</div>
+      <div class="detail-value"><%= equipment.last_calibration_date || '—' %></div>
+    </div>
+    <div>
+      <div class="detail-label">Next Calibration</div>
+      <div class="detail-value"><%= equipment.next_calibration_date || '—' %></div>
+    </div>
+    <div>
+      <div class="detail-label">Sold By Us</div>
+      <div class="detail-value"><%= equipment.sold_by_us || '—' %></div>
+    </div>
+    <% if (equipment.sold_by_us === 'Yes') { %>
+      <div>
+        <div class="detail-label">Purchase Date</div>
+        <div class="detail-value"><%= equipment.purchase_date || '—' %></div>
+      </div>
+      <div>
+        <div class="detail-label">Warranty Period</div>
+        <div class="detail-value"><%= equipment.warranty_period_months ? equipment.warranty_period_months + ' months' : '—' %></div>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<div class="detail-card">
+  <div class="detail-card-title">Calibration History</div>
+
+  <% if (calibrations.length === 0) { %>
+    <div class="empty-state">No calibration records logged for this equipment yet.</div>
+  <% } else { %>
+    <table>
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th>Done?</th>
+          <th>Status</th>
+          <th>Done Date</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% calibrations.forEach(c => { %>
+          <tr>
+            <td><%= c.description || '—' %></td>
+            <td><%= c.done %></td>
+            <td><%= c.status || '—' %></td>
+            <td><%= c.done_date || '—' %></td>
+            <td><a href="/calibrations/<%= c.id %>/edit" class="btn small secondary">Edit</a></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>
