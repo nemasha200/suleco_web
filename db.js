@@ -30,6 +30,10 @@ CREATE TABLE IF NOT EXISTS equipment (
   status TEXT DEFAULT 'Pending',
   last_notified_date TEXT,
   reminded_for_due_date TEXT,
+  response_token TEXT,
+  customer_response TEXT,
+  response_note TEXT,
+  response_at TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
 );
@@ -62,9 +66,19 @@ CREATE TABLE IF NOT EXISTS calibrations (
 
 CREATE TABLE IF NOT EXISTS dropdown_options (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  field_name TEXT NOT NULL,   -- 'equipment_type' | 'brand' | 'model'
+  field_name TEXT NOT NULL,   -- 'equipment_type' | 'brand' | 'model' | 'calibration_description'
   value TEXT NOT NULL,
   UNIQUE(field_name, value)
+);
+
+CREATE TABLE IF NOT EXISTS calibration_line_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  calibration_id INTEGER NOT NULL,
+  item_type TEXT NOT NULL,     -- 'service' | 'spare_part' | 'repair'
+  description TEXT,
+  amount REAL,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (calibration_id) REFERENCES calibrations(id) ON DELETE CASCADE
 );
 `);
 
@@ -85,6 +99,10 @@ addColumnIfMissing('purchase_date', 'purchase_date TEXT');
 addColumnIfMissing('warranty_period_months', 'warranty_period_months INTEGER');
 addColumnIfMissing('last_notified_date', 'last_notified_date TEXT');
 addColumnIfMissing('reminded_for_due_date', 'reminded_for_due_date TEXT');
+addColumnIfMissing('response_token', 'response_token TEXT');
+addColumnIfMissing('customer_response', 'customer_response TEXT');
+addColumnIfMissing('response_note', 'response_note TEXT');
+addColumnIfMissing('response_at', 'response_at TEXT');
 
 // Same safety net, but for the calibrations table (new repair fields).
 const calibrationCols = db.prepare("PRAGMA table_info(calibrations)").all().map(c => c.name);
@@ -122,6 +140,10 @@ if (equipmentCols.includes('notes')) {
         status TEXT DEFAULT 'Pending',
         last_notified_date TEXT,
         reminded_for_due_date TEXT,
+        response_token TEXT,
+        customer_response TEXT,
+        response_note TEXT,
+        response_at TEXT,
         created_at TEXT,
         FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
       );
@@ -131,11 +153,13 @@ if (equipmentCols.includes('notes')) {
       INSERT INTO equipment_new
         (id, customer_id, equipment_type, brand, model, serial_number, sold_by_us,
          purchase_date, warranty_period_months, last_calibration_date,
-         next_calibration_date, status, last_notified_date, reminded_for_due_date, created_at)
+         next_calibration_date, status, last_notified_date, reminded_for_due_date,
+         response_token, customer_response, response_note, response_at, created_at)
       SELECT
         id, customer_id, equipment_type, brand, model, serial_number, sold_by_us,
         purchase_date, warranty_period_months, last_calibration_date,
-        next_calibration_date, status, last_notified_date, reminded_for_due_date, created_at
+        next_calibration_date, status, last_notified_date, reminded_for_due_date,
+        response_token, customer_response, response_note, response_at, created_at
       FROM equipment;
     `);
 
@@ -146,18 +170,33 @@ if (equipmentCols.includes('notes')) {
   db.exec('PRAGMA foreign_keys = ON');
 }
 
+// Every piece of equipment needs a unique response_token so the "click to
+// respond" link in reminder messages works. Backfill any rows that don't
+// have one yet (new rows get one automatically at insert time — see
+// routes/equipment.js). Runs last, after any table rebuild above, so it
+// always operates on the table's final shape.
+const crypto = require('crypto');
+const rowsMissingToken = db.prepare("SELECT id FROM equipment WHERE response_token IS NULL OR response_token = ''").all();
+if (rowsMissingToken.length > 0) {
+  const setToken = db.prepare('UPDATE equipment SET response_token = ? WHERE id = ?');
+  rowsMissingToken.forEach((row) => {
+    setToken.run(crypto.randomBytes(16).toString('hex'), row.id);
+  });
+}
+
 // Seed the user-extendable dropdown option lists (Equipment Type / Brand /
 // Model), only the first time — after that, whatever values exist (including
 // any the user has added through the app) are left alone.
-const optionCount = db.prepare('SELECT COUNT(*) AS c FROM dropdown_options').get().c;
-if (optionCount === 0) {
-  const insertOption = db.prepare('INSERT OR IGNORE INTO dropdown_options (field_name, value) VALUES (?, ?)');
-  const seedOptions = (fieldName, values) => values.forEach(v => insertOption.run(fieldName, v));
+const insertOption = db.prepare('INSERT OR IGNORE INTO dropdown_options (field_name, value) VALUES (?, ?)');
+const seedOptionsIfEmpty = (fieldName, values) => {
+  const count = db.prepare('SELECT COUNT(*) AS c FROM dropdown_options WHERE field_name = ?').get(fieldName).c;
+  if (count === 0) values.forEach(v => insertOption.run(fieldName, v));
+};
 
-  seedOptions('equipment_type', ['Auto Level', 'Total Station', 'TL', 'DL']);
-  seedOptions('brand', ['Topcon', 'Leica', 'South', 'Stonex', 'Sokkia']);
-  seedOptions('model', ['GS', 'WS', 'WP', 'S900']);
-}
+seedOptionsIfEmpty('equipment_type', ['Auto Level', 'Total Station', 'TL', 'DL']);
+seedOptionsIfEmpty('brand', ['Topcon', 'Leica', 'South', 'Stonex', 'Sokkia']);
+seedOptionsIfEmpty('model', ['GS', 'WS', 'WP', 'S900']);
+seedOptionsIfEmpty('calibration_description', ['One Day Service', 'Normal Service', 'Repair', 'Full Service', 'Selling']);
 
 // One-time seed so the app isn't empty on first run
 const count = db.prepare('SELECT COUNT(*) AS c FROM customers').get().c;

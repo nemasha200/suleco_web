@@ -3,19 +3,27 @@
 <h1>Edit Calibration</h1>
 <p class="subtitle"><%= calibration.serial_number || '—' %> — <%= calibration.customer_name %></p>
 
-<div class="card" style="max-width: 720px;">
-  <form method="POST" action="/calibrations/<%= calibration.id %>/edit">
+<div class="card" style="max-width: 760px;">
+  <form method="POST" action="/calibrations/<%= calibration.id %>/edit" id="calibrationForm">
 
     <div style="background: #fff; border: 1px solid #E3E7EE; border-radius: 10px; padding: 18px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px 28px; margin-bottom: 24px;">
       <div>
-        <div class="hint" style="margin-bottom: 3px;">Company Name</div>
-        <div style="font-weight: 600; font-size: 15px;"><%= calibration.customer_name %></div>
+        <div class="hint" style="margin-bottom: 3px;">Company / Client Name</div>
+        <div style="font-weight: 600; font-size: 15px;"><%= calibration.customer_name %><% if (calibration.customer_company && calibration.customer_company !== calibration.customer_name) { %> — <%= calibration.customer_company %><% } %></div>
       </div>
       <div>
-        <div class="hint" style="margin-bottom: 3px;">Equipment</div>
-        <div style="font-weight: 600; font-size: 15px;"><%= [calibration.brand, calibration.equipment_type].filter(Boolean).join(' ') || '—' %></div>
+        <div class="hint" style="margin-bottom: 3px;">Equipment Type</div>
+        <div style="font-weight: 600; font-size: 15px;"><%= calibration.equipment_type || '—' %></div>
       </div>
       <div>
+        <div class="hint" style="margin-bottom: 3px;">Model</div>
+        <div style="font-weight: 600; font-size: 15px;"><%= calibration.model || '—' %></div>
+      </div>
+      <div>
+        <div class="hint" style="margin-bottom: 3px;">Brand</div>
+        <div style="font-weight: 600; font-size: 15px;"><%= calibration.brand || '—' %></div>
+      </div>
+      <div style="grid-column: 1 / -1;">
         <div class="hint" style="margin-bottom: 3px;">Serial Number</div>
         <div style="font-weight: 600; font-size: 15px;"><%= calibration.serial_number || '—' %></div>
       </div>
@@ -23,32 +31,54 @@
 
     <hr class="form-divider">
 
-    <div class="form-group">
-      <label>Calibration Description *</label>
-      <select name="description" required>
+    <div class="form-group option-field" data-option-field>
+      <label><i class="bi bi-card-list" style="color:var(--gold);"></i> Calibration Description *</label>
+      <select name="description" class="option-select" required>
         <option value="">Select…</option>
         <% descriptionOptions.forEach(d => { %>
           <option value="<%= d %>" <%= calibration.description === d ? 'selected' : '' %>><%= d %></option>
         <% }) %>
+        <option value="__new__">+ Add calibration description…</option>
       </select>
+      <input type="text" name="description_new" class="option-new-input" style="display:none; margin-top:6px;" placeholder="Type new calibration description">
     </div>
 
     <div class="form-group">
-      <label>Calibration Done? *</label>
+      <label><i class="bi bi-check2-square" style="color:var(--gold);"></i> Calibration Done? *</label>
       <div class="radio-group">
         <label class="radio-option">
-          <input type="radio" name="done" value="Yes" <%= calibration.done === 'Yes' ? 'checked' : '' %> required>
+          <input type="radio" name="done" value="Yes" data-done-radio <%= calibration.done === 'Yes' ? 'checked' : '' %> required>
           Done
         </label>
         <label class="radio-option">
-          <input type="radio" name="done" value="No" <%= calibration.done !== 'Yes' ? 'checked' : '' %>>
+          <input type="radio" name="done" value="No" data-done-radio <%= calibration.done !== 'Yes' ? 'checked' : '' %>>
           Not
         </label>
       </div>
     </div>
 
+    <div id="serviceFields" style="display: <%= calibration.done === 'Yes' ? 'block' : 'none' %>;" class="form-group">
+      <label>Calibration Services &amp; Amounts</label>
+      <div data-repeatable-group="service">
+        <div data-repeatable-rows>
+          <% const serviceRows = services.length > 0 ? services : [{ description: '', amount: '' }]; %>
+          <% serviceRows.forEach(item => { %>
+            <div class="repeatable-row" data-repeatable-row>
+              <input type="text" name="service_description[]" value="<%= item.description || '' %>" placeholder="Calibration performed…">
+              <div class="input-group">
+                <span class="input-group-text">Rs.</span>
+                <input type="number" step="0.01" min="0" name="service_amount[]" value="<%= item.amount !== null && item.amount !== undefined ? item.amount : '' %>" placeholder="Amount">
+              </div>
+              <button type="button" class="row-remove-btn" data-remove-row title="Remove"><i class="bi bi-x-lg"></i></button>
+            </div>
+          <% }) %>
+        </div>
+        <button type="button" class="btn secondary btn-sm mt-2" data-add-row><i class="bi bi-plus-lg"></i> Add Another Calibration &amp; Amount</button>
+      </div>
+    </div>
+
     <div class="form-group">
-      <label>Repair? *</label>
+      <label><i class="bi bi-wrench-adjustable" style="color:var(--gold);"></i> Repair? *</label>
       <div class="radio-group">
         <label class="radio-option">
           <input type="radio" name="repair" value="Yes" data-repair-radio <%= calibration.repair === 'Yes' ? 'checked' : '' %> required>
@@ -63,39 +93,157 @@
 
     <div id="repairFields" style="display: <%= calibration.repair === 'Yes' ? 'block' : 'none' %>;">
       <div class="form-group">
-        <label>Spare Part Replacement</label>
-        <input type="text" name="spare_part_replacement" value="<%= calibration.spare_part_replacement || '' %>" placeholder="e.g. Compensator, Focus lens…">
+        <label>1. Spare Part Replacement</label>
+        <div data-repeatable-group="spare_part">
+          <div data-repeatable-rows>
+            <% const spareRows = spareParts.length > 0 ? spareParts : [{ description: '', amount: '' }]; %>
+            <% spareRows.forEach(item => { %>
+              <div class="repeatable-row" data-repeatable-row>
+                <input type="text" name="spare_part_description[]" value="<%= item.description || '' %>" placeholder="Spare part…">
+                <div class="input-group">
+                  <span class="input-group-text">Rs.</span>
+                  <input type="number" step="0.01" min="0" name="spare_part_amount[]" value="<%= item.amount !== null && item.amount !== undefined ? item.amount : '' %>" placeholder="Amount">
+                </div>
+                <button type="button" class="row-remove-btn" data-remove-row title="Remove"><i class="bi bi-x-lg"></i></button>
+              </div>
+            <% }) %>
+          </div>
+          <button type="button" class="btn secondary btn-sm mt-2" data-add-row><i class="bi bi-plus-lg"></i> Add Another Spare Part &amp; Amount</button>
+        </div>
       </div>
+
       <div class="form-group">
-        <label>Description of Repair</label>
-        <input type="text" name="repair_description" value="<%= calibration.repair_description || '' %>" placeholder="Describe the repair carried out…">
+        <label>2. Description of Repair</label>
+        <div data-repeatable-group="repair_item">
+          <div data-repeatable-rows>
+            <% const repairRows = repairItems.length > 0 ? repairItems : [{ description: '', amount: '' }]; %>
+            <% repairRows.forEach(item => { %>
+              <div class="repeatable-row" data-repeatable-row>
+                <input type="text" name="repair_item_description[]" value="<%= item.description || '' %>" placeholder="Type of service & repair…">
+                <div class="input-group">
+                  <span class="input-group-text">Rs.</span>
+                  <input type="number" step="0.01" min="0" name="repair_item_amount[]" value="<%= item.amount !== null && item.amount !== undefined ? item.amount : '' %>" placeholder="Amount">
+                </div>
+                <button type="button" class="row-remove-btn" data-remove-row title="Remove"><i class="bi bi-x-lg"></i></button>
+              </div>
+            <% }) %>
+          </div>
+          <button type="button" class="btn secondary btn-sm mt-2" data-add-row><i class="bi bi-plus-lg"></i> Add Another Service &amp; Amount</button>
+        </div>
       </div>
     </div>
 
+    <div id="totalAmountRow" style="display:none; text-align:right; font-weight:700; color:var(--navy); margin-bottom: 16px;">
+      Total: Rs. <span id="totalAmountValue">0.00</span>
+    </div>
+
     <div class="form-group">
-      <label>Status</label>
+      <label><i class="bi bi-info-circle" style="color:var(--gold);"></i> Status</label>
       <input type="text" name="status" value="<%= calibration.status || '' %>" placeholder="e.g. Passed, Needs parts, Sent for repair…">
     </div>
 
     <div class="form-group">
-      <label>Done Date</label>
+      <label><i class="bi bi-calendar-check" style="color:var(--gold);"></i> Done Date</label>
       <input type="date" name="done_date" value="<%= calibration.done_date || '' %>">
     </div>
 
-    <button type="submit" class="btn" style="margin-top: 8px;">Save Changes</button>
-    <a href="/calibrations" class="btn secondary">Cancel</a>
+    <button type="submit" class="btn" style="margin-top: 8px;"><i class="bi bi-check-lg"></i> Save Changes</button>
+    <a href="/calibrations" class="btn secondary"><i class="bi bi-x-lg"></i> Cancel</a>
   </form>
 </div>
 
 <script>
+  // ---- Calibration Description "+ Add new…" reveal ----
+  document.querySelectorAll('.option-select').forEach((select) => {
+    select.addEventListener('change', () => {
+      const wrap = select.closest('[data-option-field]');
+      const newInput = wrap.querySelector('.option-new-input');
+      if (select.value === '__new__') {
+        newInput.style.display = 'block';
+        newInput.required = true;
+        newInput.value = '';
+        newInput.focus();
+      } else {
+        newInput.style.display = 'none';
+        newInput.required = false;
+        newInput.value = '';
+      }
+    });
+  });
+
+  // ---- Calibration Done? toggle ----
+  const serviceFields = document.getElementById('serviceFields');
+  document.querySelectorAll('[data-done-radio]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      const yesChecked = document.querySelector('[data-done-radio][value="Yes"]').checked;
+      serviceFields.style.display = yesChecked ? 'block' : 'none';
+      updateTotal();
+    });
+  });
+
   // ---- Repair? toggle ----
   const repairFields = document.getElementById('repairFields');
   document.querySelectorAll('[data-repair-radio]').forEach((radio) => {
     radio.addEventListener('change', () => {
       const yesChecked = document.querySelector('[data-repair-radio][value="Yes"]').checked;
       repairFields.style.display = yesChecked ? 'block' : 'none';
+      updateTotal();
     });
   });
+
+  // ---- Generic repeatable row groups (Services / Spare Parts / Repair Items) ----
+  function initRepeatableGroup(groupEl) {
+    const rowsWrap = groupEl.querySelector('[data-repeatable-rows]');
+    const addBtn = groupEl.querySelector('[data-add-row]');
+
+    addBtn.addEventListener('click', () => {
+      const firstRow = rowsWrap.querySelector('[data-repeatable-row]');
+      const clone = firstRow.cloneNode(true);
+      clone.querySelectorAll('input').forEach((el) => { el.value = ''; });
+      rowsWrap.appendChild(clone);
+    });
+
+    rowsWrap.addEventListener('click', (e) => {
+      const removeBtn = e.target.closest('[data-remove-row]');
+      if (!removeBtn) return;
+      const rows = rowsWrap.querySelectorAll('[data-repeatable-row]');
+      if (rows.length <= 1) {
+        removeBtn.closest('[data-repeatable-row]').querySelectorAll('input').forEach((el) => { el.value = ''; });
+        return;
+      }
+      removeBtn.closest('[data-repeatable-row]').remove();
+      updateTotal();
+    });
+  }
+
+  document.querySelectorAll('[data-repeatable-group]').forEach(initRepeatableGroup);
+
+  // ---- Live running total across all visible amount inputs ----
+  const totalAmountRow = document.getElementById('totalAmountRow');
+  const totalAmountValue = document.getElementById('totalAmountValue');
+
+  function updateTotal() {
+    const amountInputs = document.querySelectorAll('input[name$="_amount[]"]');
+    let total = 0;
+    let anyVisible = false;
+    amountInputs.forEach((input) => {
+      const group = input.closest('[id="serviceFields"], [id="repairFields"]');
+      const groupVisible = group ? group.style.display !== 'none' : true;
+      if (groupVisible) {
+        anyVisible = true;
+        total += Number(input.value) || 0;
+      }
+    });
+    totalAmountRow.style.display = anyVisible ? 'block' : 'none';
+    totalAmountValue.textContent = total.toFixed(2);
+  }
+
+  document.getElementById('calibrationForm').addEventListener('input', (e) => {
+    if (e.target.matches('input[name$="_amount[]"]')) updateTotal();
+  });
+
+  // Show correct total on page load (edit mode may already have amounts filled in)
+  updateTotal();
 </script>
 
 <%- include('../partials/footer') %>

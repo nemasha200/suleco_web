@@ -1,6 +1,6 @@
 :root {
-  --navy: #12294B;
-  --gold: #C9A24B;
+  --navy: #0A3648;
+  --gold: #1AA9BC;
   --grey: #5B6470;
   --light: #EEF1F6;
   --red: #C0392B;
@@ -79,18 +79,9 @@ a:hover { text-decoration: underline; }
   cursor: pointer;
   font-family: inherit;
 }
-.topbar-search button:hover { background: #d9b45f; }
-
+.topbar-search button:hover { background: #2FBED0; }
 .table-search-row { margin-bottom: 16px; }
 .table-search { max-width: 420px; }
-
-.search-row {
-  background: rgb(199, 192, 192);
-  border-bottom: 1px solid #E3E7EE;
-  padding: 14px 28px;
-  display: flex;
-  justify-content: center;
-}
 
 .container {
   max-width: 1100px;
@@ -137,7 +128,7 @@ h1 { font-size: 24px; color: var(--navy); margin-bottom: 4px; }
   border: none;
   cursor: pointer;
 }
-.btn:hover { background: #0c1d38; text-decoration: none; color: white; }
+.btn:hover { background: #072530; text-decoration: none; color: white; }
 .btn.secondary { background: white; color: var(--navy); border: 1px solid #D3D9E3; }
 .btn.secondary:hover { background: var(--light); text-decoration: none; }
 .btn.gold { background: var(--gold); color: var(--navy); }
@@ -168,6 +159,174 @@ tbody tr:hover { background: #FAFBFD; }
 .badge-amber { background: #FBF3DC; color: var(--amber); }
 .badge-green { background: #E4F3E9; color: var(--green); }
 .badge-grey { background: var(--light); color: var(--grey); }
+.badge-blue { background: #E3EDFB; color: #1D5DAD; }
+.badge-purple { background: #F1E7FB; color: #6B3FA0; }
+
+/* ---- New "Technical Tracker" style redesign components ---- */
+
+.topbar-v2 {
+  background: linear-gradient(90deg, #0B3B52 0%, #12586F 50%, #16A6B8 100%);
+  color: white;
+  padding: 12px 16px 12px 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.topbar-v2 .brand-block {
+  display: flex; align-items: center; gap: 2px;
+}
+.topbar-v2 .brand-badge {
+  height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.topbar-v2 .brand-badge .brand-logo-img {
+  height: 40px; width: auto; max-width: 200px; object-fit: contain;
+}
+.topbar-v2 .brand-text { display: flex; align-items: center; gap: 2px; line-height: 1.15; }
+.topbar-v2 .brand-text .brand-title { font-weight: 700; font-size: 16px; position: relative; top: -8px; }
+.topbar-v2 .brand-text .brand-title span { color: var(--gold); }
+.topbar-v2 .brand-text .brand-sub { font-size: 10px; letter-spacing: .08em; color: #9FB0C8; text-transform: uppercase; }
+
+.topbar-v2 nav { display: flex; align-items: center; gap: 4px; margin-left: auto; margin-right: 24px; }
+.topbar-v2 nav a {
+  color: #DCE3EE; padding: 8px 14px; border-radius: 6px;
+  font-size: 14px; font-weight: 500;
+}
+.topbar-v2 nav a:hover { background: rgba(255,255,255,0.08); text-decoration: none; }
+.topbar-v2 nav a.active { background: rgba(255,255,255,0.12); color: white; }
+
+.topbar-v2 .actions { display: flex; align-items: center; gap: 14px; }
+.topbar-v2 .bell-btn {
+  position: relative; background: none; border: none; color: #DCE3EE;
+  font-size: 18px; cursor: pointer; padding: 6px;
+}
+.topbar-v2 .bell-dot {
+  position: absolute; top: 2px; right: 2px; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--red); border: 1.5px solid var(--navy);
+}
+.topbar-v2 .avatar-chip {
+  display: flex; align-items: center; gap: 8px; color: #DCE3EE; font-size: 14px;
+}
+.topbar-v2 .avatar-circle {
+  width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,0.12);
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;
+}
+.topbar-v2 form.logout-form button {
+  background: none; border: none; color: #DCE3EE; font-size: 14px; cursor: pointer; padding: 6px 10px;
+}
+.topbar-v2 form.logout-form button:hover { text-decoration: underline; }
+
+/* Stat cards with icon circle */
+.stat-card-v2 {
+  background: white; border-radius: 10px; padding: 20px 22px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border-left: 4px solid var(--navy);
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+}
+.stat-card-v2.red { border-left-color: var(--red); }
+.stat-card-v2.amber { border-left-color: var(--amber); }
+.stat-card-v2.blue { border-left-color: #2E5FA3; }
+.stat-card-v2 .num { font-size: 30px; font-weight: 700; color: var(--navy); line-height: 1; }
+.stat-card-v2 .label { font-size: 14px; font-weight: 600; color: #1F2430; margin-top: 6px; }
+.stat-card-v2 .hint2 { font-size: 12px; color: var(--grey); margin-top: 2px; }
+.stat-icon-circle {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.stat-icon-circle.red { background: #FBEAE8; color: var(--red); }
+.stat-icon-circle.amber { background: #FBF3DC; color: var(--amber); }
+.stat-icon-circle.blue { background: #E3EDFB; color: #2E5FA3; }
+
+/* Avatar circle (used in customer/company name cells) */
+.avatar-circle-sm {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: #F3E7CE; color: var(--amber);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 13px; margin-right: 10px; vertical-align: middle;
+}
+
+/* Service package cards (Services page) */
+.service-card {
+  background: white; border-radius: 12px; padding: 22px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border-top: 4px solid var(--navy);
+}
+.service-card.c-blue { border-top-color: #2E5FA3; }
+.service-card.c-gold { border-top-color: var(--gold); }
+.service-card.c-purple { border-top-color: #7B4FB5; }
+.service-card.c-green { border-top-color: var(--green); }
+.service-icon-circle {
+  width: 44px; height: 44px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; margin-bottom: 14px; background: var(--light); color: var(--navy);
+}
+.service-card h3 { font-size: 16px; margin: 0 0 8px; color: var(--navy); }
+.service-card p { font-size: 13px; color: var(--grey); margin: 0 0 16px; min-height: 54px; }
+.service-card .service-meta {
+  display: flex; justify-content: space-between; align-items: center;
+  border-top: 1px solid #EEF0F4; padding-top: 12px; font-size: 13px;
+}
+.service-card .service-meta .duration { color: var(--grey); }
+.service-card .service-meta .price { font-weight: 700; color: #2E5FA3; }
+
+.panel-dark {
+  background: var(--navy); color: white; border-radius: 10px 10px 0 0;
+  padding: 18px 22px; display: flex; justify-content: space-between; align-items: center;
+}
+.panel-dark h3 { margin: 0; font-size: 16px; }
+.panel-dark .panel-sub { font-size: 12px; color: #9FB0C8; margin-top: 2px; }
+.panel-dark + table { border-radius: 0 0 10px 10px; box-shadow: none; }
+
+/* Footer v2 */
+.footer-v2 {
+  background: var(--navy); color: #C9D2E0; margin-top: 48px;
+  padding: 48px 40px 0;
+}
+.footer-v2 .footer-grid {
+  display: grid; grid-template-columns: 1.4fr 1fr 1fr 1.2fr; gap: 32px;
+  max-width: 1200px; margin: 0 auto; padding-bottom: 36px;
+}
+.footer-v2 h4 {
+  color: white; font-size: 13px; letter-spacing: .05em; text-transform: uppercase;
+  margin: 0 0 16px;
+}
+.footer-v2 .footer-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.footer-v2 .footer-brand .brand-badge {
+  width: 34px; height: 34px; border-radius: 8px; background: var(--gold); color: var(--navy);
+  display: flex; align-items: center; justify-content: center; font-size: 16px;
+}
+.footer-v2 .footer-brand .brand-title { font-weight: 700; color: white; font-size: 15px; }
+.footer-v2 .footer-brand .brand-title span { color: var(--gold); }
+.footer-v2 .footer-brand .brand-sub { font-size: 9px; letter-spacing: .08em; color: #9FB0C8; text-transform: uppercase; }
+.footer-v2 p.tagline { font-size: 13px; line-height: 1.6; color: #9FB0C8; }
+.footer-v2 .status-dot { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #9FB0C8; margin-top: 10px; }
+.footer-v2 .status-dot .dot { width: 8px; height: 8px; border-radius: 50%; background: #34C575; }
+.footer-v2 ul { list-style: none; margin: 0; padding: 0; }
+.footer-v2 ul li { margin-bottom: 10px; }
+.footer-v2 ul li a { color: #C9D2E0; font-size: 13px; }
+.footer-v2 ul li a:hover { color: white; }
+.footer-v2 .contact-line { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; font-size: 13px; color: #C9D2E0; }
+.footer-v2 .contact-line i { color: var(--gold); margin-top: 2px; }
+.footer-v2 .subscribe-text { font-size: 13px; color: #9FB0C8; margin-bottom: 12px; }
+.footer-v2 input[type="email"] {
+  width: 100%; padding: 9px 12px; border-radius: 6px; border: 1px solid #2A3F5F;
+  background: #0F2038; color: white; font-size: 13px; margin-bottom: 10px;
+}
+.footer-v2 .hours { font-size: 12px; color: #9FB0C8; margin-top: 14px; border-top: 1px solid #2A3F5F; padding-top: 12px; }
+.footer-v2 .footer-bottom {
+  border-top: 1px solid #2A3F5F; padding: 18px 0; font-size: 12px; color: #9FB0C8;
+  display: flex; justify-content: space-between; max-width: 1200px; margin: 0 auto;
+}
+.footer-v2 .footer-bottom a { color: #9FB0C8; margin-left: 18px; }
+.footer-v2 .footer-bottom a:hover { color: white; }
+
+@media (max-width: 900px) {
+  .footer-v2 .footer-grid { grid-template-columns: 1fr 1fr; }
+  .footer-v2 .footer-bottom { flex-direction: column; gap: 8px; }
+  .topbar-v2 nav { display: none; }
+}
 
 .card {
   background: #FFFFFF;
@@ -178,7 +337,7 @@ tbody tr:hover { background: #FAFBFD; }
   max-width: 480px;
 }
 
-/* Wide detail panels (equipment view page, etc.) — same look as .card but
+/* Wide detail panels (equipment view page, etc.) â€” same look as .card but
    without the narrow max-width, so multi-column grids have room to breathe. */
 .detail-card {
   background: white;
@@ -274,6 +433,18 @@ tbody tr:hover { background: #FAFBFD; }
   align-items: start;
 }
 .row-remove-wrap { display: flex; align-items: center; height: 100%; padding-top: 28px; }
+
+/* Repeatable line-item rows (calibration services, spare parts, repairs) */
+.repeatable-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+@media (max-width: 600px) {
+  .repeatable-row { grid-template-columns: 1fr; }
+}
 .row-remove-btn {
   background: #FBEAE8;
   color: var(--red);

@@ -3,7 +3,13 @@ const router = express.Router();
 const db = require('../db');
 
 router.get('/', (req, res) => {
-  const customers = db.prepare('SELECT * FROM customers ORDER BY name ASC').all();
+  const customers = db.prepare(`
+    SELECT customers.*, COUNT(equipment.id) AS equipment_count
+    FROM customers
+    LEFT JOIN equipment ON equipment.customer_id = customers.id
+    GROUP BY customers.id
+    ORDER BY customers.name ASC
+  `).all();
   res.render('customers/list', { customers, username: req.session.username });
 });
 

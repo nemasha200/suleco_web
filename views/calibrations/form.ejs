@@ -7,12 +7,12 @@
   <div class="empty-state" style="border-color:#2e7d32; color:#2e7d32;"><%= flash %></div>
 <% } %>
 
-<div class="card" style="max-width: 720px;">
+<div class="card" style="max-width: 760px;">
   <form method="POST" action="/calibrations/new" id="calibrationForm">
 
     <!-- Serial number search-select -->
     <div class="form-group combo-wrap">
-      <label>Serial Number *</label>
+      <label><i class="bi bi-hash" style="color:var(--gold);"></i> Serial Number *</label>
       <input
         type="text"
         id="serialSearchInput"
@@ -29,58 +29,78 @@
     <div id="equipmentInfoPanel" style="display:none; margin-bottom: 24px;">
       <div style="background: #fff; border: 1px solid #E3E7EE; border-radius: 10px; padding: 18px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px 28px;">
         <div>
-          <div class="hint" style="margin-bottom: 3px;">Company Name</div>
+          <div class="hint" style="margin-bottom: 3px;">Company / Client Name</div>
           <div id="infoCompanyName" style="font-weight: 600; font-size: 15px;">—</div>
         </div>
         <div>
-          <div class="hint" style="margin-bottom: 3px;">Equipment</div>
-          <div id="infoEquipmentLabel" style="font-weight: 600; font-size: 15px;">—</div>
+          <div class="hint" style="margin-bottom: 3px;">Equipment Type</div>
+          <div id="infoEquipmentType" style="font-weight: 600; font-size: 15px;">—</div>
         </div>
         <div>
-          <div class="hint" style="margin-bottom: 3px;">Sold By Us</div>
-          <div id="infoSoldByUs" style="font-weight: 600; font-size: 15px;">—</div>
+          <div class="hint" style="margin-bottom: 3px;">Model</div>
+          <div id="infoModel" style="font-weight: 600; font-size: 15px;">—</div>
         </div>
         <div>
-          <div class="hint" style="margin-bottom: 3px;">Purchase Date</div>
-          <div id="infoPurchaseDate" style="font-weight: 600; font-size: 15px;">—</div>
+          <div class="hint" style="margin-bottom: 3px;">Brand</div>
+          <div id="infoBrand" style="font-weight: 600; font-size: 15px;">—</div>
         </div>
       </div>
 
       <div style="margin-top: 14px;">
-        <div class="hint" style="margin-bottom: 8px;">Calibration History</div>
+        <div class="hint" style="margin-bottom: 8px;"><i class="bi bi-clock-history"></i> Calibrations History (all dates)</div>
         <div id="infoDoneDates" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
       </div>
     </div>
 
     <hr class="form-divider">
 
-    <!-- Calibration status -->
-    <div class="form-group">
-      <label>Calibration Description *</label>
-      <select name="description" required>
+    <!-- Calibration description, with "+ Add new" like the equipment dropdowns -->
+    <div class="form-group option-field" data-option-field>
+      <label><i class="bi bi-card-list" style="color:var(--gold);"></i> Calibration Description *</label>
+      <select name="description" class="option-select" required>
         <option value="">Select…</option>
         <% descriptionOptions.forEach(d => { %>
           <option value="<%= d %>"><%= d %></option>
         <% }) %>
+        <option value="__new__">+ Add calibration description…</option>
       </select>
+      <input type="text" name="description_new" class="option-new-input" style="display:none; margin-top:6px;" placeholder="Type new calibration description">
     </div>
 
     <div class="form-group">
-      <label>Calibration Done? *</label>
+      <label><i class="bi bi-check2-square" style="color:var(--gold);"></i> Calibration Done? *</label>
       <div class="radio-group">
         <label class="radio-option">
-          <input type="radio" name="done" value="Yes" required>
+          <input type="radio" name="done" value="Yes" data-done-radio required>
           Done
         </label>
         <label class="radio-option">
-          <input type="radio" name="done" value="No" checked>
+          <input type="radio" name="done" value="No" data-done-radio checked>
           Not
         </label>
       </div>
     </div>
 
+    <!-- Repeatable Service + Amount rows, shown only when Done = Yes -->
+    <div id="serviceFields" style="display:none;" class="form-group">
+      <label>Calibration Services &amp; Amounts</label>
+      <div data-repeatable-group="service">
+        <div data-repeatable-rows>
+          <div class="repeatable-row" data-repeatable-row>
+            <input type="text" name="service_description[]" placeholder="Calibration performed…">
+            <div class="input-group">
+              <span class="input-group-text">Rs.</span>
+              <input type="number" step="0.01" min="0" name="service_amount[]" placeholder="Amount">
+            </div>
+            <button type="button" class="row-remove-btn" data-remove-row title="Remove"><i class="bi bi-x-lg"></i></button>
+          </div>
+        </div>
+        <button type="button" class="btn secondary btn-sm mt-2" data-add-row><i class="bi bi-plus-lg"></i> Add Another Calibration &amp; Amount</button>
+      </div>
+    </div>
+
     <div class="form-group">
-      <label>Repair? *</label>
+      <label><i class="bi bi-wrench-adjustable" style="color:var(--gold);"></i> Repair? *</label>
       <div class="radio-group">
         <label class="radio-option">
           <input type="radio" name="repair" value="Yes" data-repair-radio required>
@@ -94,28 +114,59 @@
     </div>
 
     <div id="repairFields" style="display:none;">
+      <!-- Repeatable Spare Part + Amount rows -->
       <div class="form-group">
-        <label>Spare Part Replacement</label>
-        <input type="text" name="spare_part_replacement" placeholder="e.g. Compensator, Focus lens…">
+        <label>1. Spare Part Replacement</label>
+        <div data-repeatable-group="spare_part">
+          <div data-repeatable-rows>
+            <div class="repeatable-row" data-repeatable-row>
+              <input type="text" name="spare_part_description[]" placeholder="Spare part…">
+              <div class="input-group">
+                <span class="input-group-text">Rs.</span>
+                <input type="number" step="0.01" min="0" name="spare_part_amount[]" placeholder="Amount">
+              </div>
+              <button type="button" class="row-remove-btn" data-remove-row title="Remove"><i class="bi bi-x-lg"></i></button>
+            </div>
+          </div>
+          <button type="button" class="btn secondary btn-sm mt-2" data-add-row><i class="bi bi-plus-lg"></i> Add Another Spare Part &amp; Amount</button>
+        </div>
       </div>
+
+      <!-- Repeatable Repair Service + Amount rows -->
       <div class="form-group">
-        <label>Description of Repair</label>
-        <input type="text" name="repair_description" placeholder="Describe the repair carried out…">
+        <label>2. Description of Repair</label>
+        <div data-repeatable-group="repair_item">
+          <div data-repeatable-rows>
+            <div class="repeatable-row" data-repeatable-row>
+              <input type="text" name="repair_item_description[]" placeholder="Type of service & repair…">
+              <div class="input-group">
+                <span class="input-group-text">Rs.</span>
+                <input type="number" step="0.01" min="0" name="repair_item_amount[]" placeholder="Amount">
+              </div>
+              <button type="button" class="row-remove-btn" data-remove-row title="Remove"><i class="bi bi-x-lg"></i></button>
+            </div>
+          </div>
+          <button type="button" class="btn secondary btn-sm mt-2" data-add-row><i class="bi bi-plus-lg"></i> Add Another Service &amp; Amount</button>
+        </div>
       </div>
     </div>
 
+    <div id="totalAmountRow" style="display:none; text-align:right; font-weight:700; color:var(--navy); margin-bottom: 16px;">
+      Total: Rs. <span id="totalAmountValue">0.00</span>
+    </div>
+
     <div class="form-group">
-      <label>Status</label>
+      <label><i class="bi bi-info-circle" style="color:var(--gold);"></i> Status</label>
       <input type="text" name="status" placeholder="e.g. Passed, Needs parts, Sent for repair…">
     </div>
 
     <div class="form-group">
-      <label>Done Date</label>
+      <label><i class="bi bi-calendar-check" style="color:var(--gold);"></i> Done Date</label>
       <input type="date" name="done_date" id="doneDateInput">
     </div>
 
-    <button type="submit" class="btn" style="margin-top: 8px;">Save Calibration</button>
-    <a href="/calibrations" class="btn secondary">Cancel</a>
+    <button type="submit" class="btn" style="margin-top: 8px;"><i class="bi bi-check-lg"></i> Save Calibration</button>
+    <a href="/calibrations" class="btn secondary"><i class="bi bi-x-lg"></i> Cancel</a>
   </form>
 </div>
 
@@ -128,13 +179,11 @@
   const resultsBox = document.getElementById('serialResults');
   const infoPanel = document.getElementById('equipmentInfoPanel');
   const infoCompanyName = document.getElementById('infoCompanyName');
-  const infoEquipmentLabel = document.getElementById('infoEquipmentLabel');
-  const infoSoldByUs = document.getElementById('infoSoldByUs');
-  const infoPurchaseDate = document.getElementById('infoPurchaseDate');
+  const infoEquipmentType = document.getElementById('infoEquipmentType');
+  const infoModel = document.getElementById('infoModel');
+  const infoBrand = document.getElementById('infoBrand');
   const infoDoneDates = document.getElementById('infoDoneDates');
 
-  // Only append the company if it's actually different text from the name
-  // (avoids "Lal Constructions — Lal Constructions" when they're the same).
   function companyLabel(e) {
     if (e.customer_company && e.customer_company.trim() && e.customer_company.trim() !== (e.customer_name || '').trim()) {
       return `${e.customer_name} — ${e.customer_company}`;
@@ -142,12 +191,12 @@
     return e.customer_name || '—';
   }
 
-  function equipmentLabel(e) {
+  function equipmentSummary(e) {
     return [e.brand, e.equipment_type].filter(Boolean).join(' ') || '—';
   }
 
   function labelFor(e) {
-    return `${e.serial_number} (${equipmentLabel(e)}) — ${companyLabel(e)}`;
+    return `${e.serial_number} (${equipmentSummary(e)}) — ${companyLabel(e)}`;
   }
 
   function renderResults(list) {
@@ -158,7 +207,7 @@
     }
     resultsBox.innerHTML = list.map(e =>
       `<div class="combo-item" data-id="${e.id}">
-        <strong>${e.serial_number || '—'}</strong> — ${equipmentLabel(e)}<br>
+        <strong>${e.serial_number || '—'}</strong> — ${equipmentSummary(e)}<br>
         <span class="hint">${companyLabel(e)}</span>
       </div>`
     ).join('');
@@ -190,11 +239,10 @@
     searchInput.value = labelFor(equipment);
     resultsBox.style.display = 'none';
 
-    // auto-fill the info panel
     infoCompanyName.textContent = companyLabel(equipment);
-    infoEquipmentLabel.textContent = equipmentLabel(equipment);
-    infoSoldByUs.textContent = equipment.sold_by_us || 'No';
-    infoPurchaseDate.textContent = equipment.purchase_date || '—';
+    infoEquipmentType.textContent = equipment.equipment_type || '—';
+    infoModel.textContent = equipment.model || '—';
+    infoBrand.textContent = equipment.brand || '—';
 
     const history = DONE_DATES_BY_EQUIPMENT[equipment.id] || [];
     infoDoneDates.innerHTML = history.length
@@ -208,13 +256,95 @@
     if (!e.target.closest('.combo-wrap')) resultsBox.style.display = 'none';
   });
 
+  // ---- Calibration Description "+ Add new…" reveal ----
+  document.querySelectorAll('.option-select').forEach((select) => {
+    select.addEventListener('change', () => {
+      const wrap = select.closest('[data-option-field]');
+      const newInput = wrap.querySelector('.option-new-input');
+      if (select.value === '__new__') {
+        newInput.style.display = 'block';
+        newInput.required = true;
+        newInput.value = '';
+        newInput.focus();
+      } else {
+        newInput.style.display = 'none';
+        newInput.required = false;
+        newInput.value = '';
+      }
+    });
+  });
+
+  // ---- Calibration Done? toggle ----
+  const serviceFields = document.getElementById('serviceFields');
+  document.querySelectorAll('[data-done-radio]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      const yesChecked = document.querySelector('[data-done-radio][value="Yes"]').checked;
+      serviceFields.style.display = yesChecked ? 'block' : 'none';
+      updateTotal();
+    });
+  });
+
   // ---- Repair? toggle ----
   const repairFields = document.getElementById('repairFields');
   document.querySelectorAll('[data-repair-radio]').forEach((radio) => {
     radio.addEventListener('change', () => {
       const yesChecked = document.querySelector('[data-repair-radio][value="Yes"]').checked;
       repairFields.style.display = yesChecked ? 'block' : 'none';
+      updateTotal();
     });
+  });
+
+  // ---- Generic repeatable row groups (Services / Spare Parts / Repair Items) ----
+  function initRepeatableGroup(groupEl) {
+    const rowsWrap = groupEl.querySelector('[data-repeatable-rows]');
+    const addBtn = groupEl.querySelector('[data-add-row]');
+
+    addBtn.addEventListener('click', () => {
+      const firstRow = rowsWrap.querySelector('[data-repeatable-row]');
+      const clone = firstRow.cloneNode(true);
+      clone.querySelectorAll('input').forEach((el) => { el.value = ''; });
+      rowsWrap.appendChild(clone);
+    });
+
+    rowsWrap.addEventListener('click', (e) => {
+      const removeBtn = e.target.closest('[data-remove-row]');
+      if (!removeBtn) return;
+      const rows = rowsWrap.querySelectorAll('[data-repeatable-row]');
+      if (rows.length <= 1) {
+        // keep at least one row, just clear it instead of removing
+        removeBtn.closest('[data-repeatable-row]').querySelectorAll('input').forEach((el) => { el.value = ''; });
+        return;
+      }
+      removeBtn.closest('[data-repeatable-row]').remove();
+      updateTotal();
+    });
+  }
+
+  document.querySelectorAll('[data-repeatable-group]').forEach(initRepeatableGroup);
+
+  // ---- Live running total across all visible amount inputs ----
+  const totalAmountRow = document.getElementById('totalAmountRow');
+  const totalAmountValue = document.getElementById('totalAmountValue');
+
+  function updateTotal() {
+    const amountInputs = document.querySelectorAll('input[name$="_amount[]"]');
+    let total = 0;
+    let anyVisible = false;
+    amountInputs.forEach((input) => {
+      const row = input.closest('[data-repeatable-row]');
+      const group = input.closest('[id="serviceFields"], [id="repairFields"]');
+      const groupVisible = group ? group.style.display !== 'none' : true;
+      if (groupVisible) {
+        anyVisible = true;
+        total += Number(input.value) || 0;
+      }
+    });
+    totalAmountRow.style.display = anyVisible ? 'block' : 'none';
+    totalAmountValue.textContent = total.toFixed(2);
+  }
+
+  document.getElementById('calibrationForm').addEventListener('input', (e) => {
+    if (e.target.matches('input[name$="_amount[]"]')) updateTotal();
   });
 </script>
 
