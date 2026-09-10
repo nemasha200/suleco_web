@@ -1,6 +1,6 @@
-<%- include('../partials/header', { title: 'Add Calibration', username }) %>
+<%- include('../partials/header', { title: 'Calibrations', username, bodyClass: 'calibrations-page' }) %>
 
-<h1>Add Calibration</h1>
+<h1>Add Service</h1>
 <p class="subtitle">Search by serial number, then log this calibration for that equipment.</p>
 
 <% if (typeof flash !== 'undefined' && flash) { %>
@@ -8,6 +8,14 @@
 <% } %>
 
 <div class="card" style="max-width: 760px;">
+  <!-- Negative margins pull the strip out to the card's edges, cancelling the
+       card's own 24px padding so the blue runs corner to corner. -->
+  <div class="d-flex align-items-center gap-2 mb-4"
+       style="background: var(--navy); color: #fff; margin: -24px -24px 0; padding: 16px 24px; border-radius: 10px 10px 0 0;">
+    <i class="bi bi-clipboard-check fs-4" style="color: var(--gold);"></i>
+    <span style="font-weight:700;">New Service Record</span>
+  </div>
+
   <form method="POST" action="/calibrations/new" id="calibrationForm">
 
     <!-- Serial number search-select -->

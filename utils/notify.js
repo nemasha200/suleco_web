@@ -1,11 +1,24 @@
+// ---------------------------------------------------------------------------
+// DELIVERY ONLY — how a message gets out, not what it says.
+//
+// Wording and layout live in their own files:
+//   utils/emailTemplate.js  — subject, text body, HTML body
+//   utils/smsTemplate.js    — the single SMS line
+//   utils/messageBase.js    — company identity shared by both
+//
+// Nothing customer-facing should be written in this file. If you are here to
+// change how a reminder reads, you are in the wrong file.
+// ---------------------------------------------------------------------------
+
 const nodemailer = require('nodemailer');
+const { COMPANY, CONTACT } = require('./messageBase');
+const { buildEmailMessage } = require('./emailTemplate');
+const { buildSmsMessage } = require('./smsTemplate');
 
 // --- Email transport ---
 // If real SMTP settings are in .env, use them (actually delivers email).
 // If not, lazily spin up a free Ethereal test inbox the first time an email
-// is sent — this lets you verify the whole send pipeline works without a
-// real mail account. Every "sent" test email gets a preview link you can
-// open in a browser to see exactly what would have been delivered.
+// is sent, with a preview link so you can see what would have been delivered.
 let cachedTransporter = null;
 let usingTestInbox = false;
 
@@ -23,8 +36,7 @@ async function getTransporter() {
       },
       // Force IPv4 — on some Windows machines, Node tries IPv6 first and
       // hangs waiting for Gmail's greeting, causing a false "Greeting never
-      // received" failure. Also add generous timeouts instead of the
-      // library defaults, so a slow network retries/fails fast and clearly
+      // received" failure. Generous timeouts so a slow network fails clearly
       // rather than hanging indefinitely.
       family: 4,
       connectionTimeout: 15000,
@@ -59,7 +71,10 @@ const TEXTLK_API_KEY = process.env.TEXTLK_API_KEY;
 const TEXTLK_SENDER_ID = process.env.TEXTLK_SENDER_ID;
 const TEXTLK_ENDPOINT = 'https://app.text.lk/api/v3/sms/send';
 
-async function sendEmail(to, subject, text) {
+// `html` is optional. When supplied, the message goes out as multipart:
+// clients that render HTML show the formatted version, and anything that
+// doesn't falls back to `text`. Both carry the same information.
+async function sendEmail(to, subject, text, html) {
   if (!to) return { status: 'skipped', detail: 'no email on file' };
 
   const transporter = await getTransporter();
@@ -67,10 +82,14 @@ async function sendEmail(to, subject, text) {
 
   try {
     const info = await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@calibration-tracker.local',
+      // A display name makes the sender read as "Suleco Technical Division"
+      // in the client's inbox rather than a bare gmail address.
+      from: process.env.SMTP_FROM
+        || `"${COMPANY.name} ${COMPANY.division}" <${process.env.SMTP_USER || 'noreply@calibration-tracker.local'}>`,
       to,
       subject,
       text,
+      ...(html ? { html } : {}),
     });
 
     if (usingTestInbox) {
@@ -137,16 +156,21 @@ function normalizePhoneForTextLk(phone) {
   return trimmed;
 }
 
+// Kept so any older code calling buildMessage() still works. New code should
+// require the template files directly.
 function buildMessage(row) {
-  const overdue = row.daysLeft !== null && row.daysLeft < 0;
-  const dueText = overdue
-    ? `is OVERDUE for calibration (was due ${row.next_calibration_date})`
-    : `is due for calibration on ${row.next_calibration_date}`;
-
-  const subject = `Calibration reminder: ${row.brand || ''} ${row.equipment_type || ''}`.trim();
-  const text = `Hi ${row.customer_name},\n\nYour equipment (${row.brand || ''} ${row.equipment_type || ''}, S/N ${row.serial_number || 'N/A'}) ${dueText}.\nPlease contact us to schedule calibration.\n\nThank you.`;
-
-  return { subject, text };
+  const email = buildEmailMessage(row);
+  return { ...email, sms: buildSmsMessage(row) };
 }
 
-module.exports = { sendEmail, sendSMS, buildMessage };
+// The template builders are re-exported so existing requires of this file keep
+// working unchanged — scheduler.js and routes/dashboard.js need no edits.
+module.exports = {
+  sendEmail,
+  sendSMS,
+  buildMessage,
+  buildEmailMessage,
+  buildSmsMessage,
+  COMPANY,
+  CONTACT,
+};

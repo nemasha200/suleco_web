@@ -7,15 +7,32 @@
   --amber: #B8860B;
   --green: #1E7B45;
   --bg: #22a92621;
+  --page-bg-image: url('/images/bg-hex-original.jpg');
+  --page-bg-gradient: linear-gradient(
+      155deg,
+      rgba(255, 255, 255, 0.42) 0%,
+      rgba(255, 255, 255, 0.62) 55%,
+      rgba(232, 243, 250, 0.78) 100%
+    );
+  --page-bg-heading: #0A3648;
+  --page-bg-subtext: #5B6470;
 }
 
 * { box-sizing: border-box; }
-
 body {
   font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   margin: 0;
-  background: var(--bg);
   color: #1F2430;
+
+  /* The image sits behind everything and stays put while the page scrolls.
+     var(--bg) stays as the base colour so the page never flashes white
+     before the image loads, and still looks right if it fails to load. */
+  background-color: var(--bg);
+  background-image: url("/images/bg-tech.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 a { color: var(--navy); text-decoration: none; }
@@ -165,7 +182,7 @@ tbody tr:hover { background: #FAFBFD; }
 /* ---- New "Technical Tracker" style redesign components ---- */
 
 .topbar-v2 {
-  background: linear-gradient(90deg, #0B3B52 0%, #12586F 50%, #16A6B8 100%);
+  background: linear-gradient(90deg, #0B3B52 0%, #117f8e 50%,#0B3B52 100%);
   color: white;
   padding: 12px 16px 12px 6px;
   display: flex;
@@ -570,3 +587,218 @@ tbody tr:hover { background: #FAFBFD; }
   color: var(--grey);
   margin-top: 4px;
 }
+
+/* QR popup, opened from the QR button in the Calibration History table */
+.qr-modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 54, 72, 0.55);
+  z-index: 1050;
+  padding: 20px;
+  overflow-y: auto;
+}
+.qr-modal-overlay.is-open { display: flex; align-items: flex-start; justify-content: center; }
+
+.qr-modal {
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px 22px 22px;
+  max-width: 720px;
+  width: 100%;
+  margin: auto;
+  box-shadow: 0 18px 45px rgba(10, 54, 72, 0.28);
+}
+.qr-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.qr-modal-close {
+  background: none;
+  border: none;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--grey);
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+.qr-modal-close:hover { background: var(--light); color: var(--navy); }
+/* ===================== Automation status strip ===================== */
+/* Replaces the old single-line "Last automatic run: ..." sentence. Layout is
+   a status dot, a two-line message, and a right-hand meta column that drops
+   below the message on narrow screens. */
+
+.auto-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid #DEE4EC;
+  border-left: 4px solid var(--grey);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+
+.auto-status__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--grey);
+  flex: 0 0 auto;
+  margin-top: 6px;
+}
+
+.auto-status__body { flex: 1 1 auto; min-width: 0; }
+
+.auto-status__headline {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1F2430;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.auto-status__detail {
+  font-size: 13px;
+  color: var(--grey);
+  line-height: 1.55;
+  margin-top: 3px;
+}
+
+.auto-status__tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #FBF3DC;
+  color: var(--amber);
+  cursor: help;
+}
+
+.auto-status__meta {
+  flex: 0 0 auto;
+  text-align: right;
+  font-size: 12px;
+  color: var(--grey);
+  padding-left: 8px;
+}
+
+.auto-status__next { white-space: nowrap; }
+.auto-status__next strong { color: #1F2430; font-weight: 600; }
+
+.auto-status__link {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold);
+}
+
+/* Tone variants: the dot and left border carry the state, so the strip reads
+   at a glance without needing the text. */
+.auto-status--ok      { border-left-color: var(--green); }
+.auto-status--ok      .auto-status__dot { background: var(--green); box-shadow: 0 0 0 3px #E4F3E9; }
+.auto-status--pending { border-left-color: var(--gold); }
+.auto-status--pending .auto-status__dot { background: var(--gold); box-shadow: 0 0 0 3px #E1F4F6; }
+.auto-status--warning { border-left-color: var(--amber); background: #FFFDF7; }
+.auto-status--warning .auto-status__dot { background: var(--amber); box-shadow: 0 0 0 3px #FBF3DC; }
+.auto-status--error   { border-left-color: var(--red); background: #FFF8F7; }
+.auto-status--error   .auto-status__dot { background: var(--red); box-shadow: 0 0 0 3px #FBEAE8; }
+
+@media (max-width: 720px) {
+  .auto-status { flex-wrap: wrap; }
+  .auto-status__meta {
+    text-align: left;
+    padding-left: 21px;
+    width: 100%;
+    margin-top: 8px;
+  }
+  .auto-status__link { margin-left: 12px; }
+}
+
+/* ===================== Dashboard background image ===================== */
+/* Applied via <body class="has-page-bg">, which views/dashboard.ejs passes to
+   the header partial. Scoped to a class rather than plain `body` so only the
+   pages that opt in get it — forms and tables elsewhere stay on flat colour.
+
+   The image is attached to a fixed pseudo-element rather than to `body`
+   directly. Putting a background on `body` with `background-attachment: fixed`
+   is unreliable on iOS Safari (it jitters or drops out while scrolling), and
+   with `scroll` the image would tile down a long equipment table instead of
+   staying put. A fixed ::before layer avoids both problems. */
+
+body.has-page-bg { position: relative; background: var(--light); }
+
+body.has-page-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;                 /* sits behind all content, including the topbar */
+  background-image: var(--page-bg-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* A translucent veil over the photo. Without it, busy areas of the image
+   swallow the text and card edges. Adjust via the --page-bg-veil-* variables
+   at the top of this file rather than editing this rule. */
+body.has-page-bg::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: rgba(var(--page-bg-veil-rgb), var(--page-bg-veil));
+}
+
+/* Text that sits DIRECTLY on the background (not inside a white card) has to
+   flip to light, or it disappears against a dark veil. Anything inside a card
+   keeps its normal dark colours — those cards are still white. */
+body.has-page-bg > .container > h1 { color: var(--page-bg-heading); }
+body.has-page-bg > .container > .subtitle { color: var(--page-bg-subtext); }
+
+/* Cards and tables need their own solid backgrounds now, otherwise the image
+   shows through and text becomes hard to read. */
+body.has-page-bg .stat-card,
+body.has-page-bg .card,
+body.has-page-bg table,
+body.has-page-bg .auto-status,
+body.has-page-bg .empty-state {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(10, 54, 72, 0.08);
+}
+
+body.has-page-bg .auto-status--warning { background: #FFFDF7; }
+body.has-page-bg .auto-status--error   { background: #FFF8F7; }
+
+/* Respect users who ask their OS to reduce motion/visual noise. */
+@media (prefers-reduced-motion: reduce) {
+  body.has-page-bg::before { background-image: none; }
+}
+
+
+
+body.customers-page,
+body.calibrations-page,
+body.equipment-page {
+  background:
+    linear-gradient(rgba(191, 214, 213, 0.85), rgba(177, 198, 215, 0.85)),
+    url('/images/bg_1.jpg') center / cover no-repeat fixed;
+  min-height: 100vh;
+}
+
+/* ---- Per-page background overrides ----
+   The image comes from --page-bg-image, so a page only needs to redefine that
+   variable rather than repeat the whole ::before rule. Add the class alongside
+   has-page-bg in the view's bodyClass:
+       bodyClass: 'has-page-bg page-bg--customer'                            */
+
+body.page-bg--customer { --page-bg-image: url('/images/bg-1.jpg'); }

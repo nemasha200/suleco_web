@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS customers (
 CREATE TABLE IF NOT EXISTS equipment (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   customer_id INTEGER NOT NULL,
+  company_category TEXT,   -- 'Survey' | 'Lab' | 'Drones'
   equipment_type TEXT,
   brand TEXT,
   model TEXT,
@@ -48,6 +49,26 @@ CREATE TABLE IF NOT EXISTS notification_log (
   detail TEXT,
   sent_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+);
+
+-- One row per reminder SWEEP (not per message). This is the audit trail that
+-- proves the 9 AM job actually ran on a given day, and what it did. The
+-- dashboard reads the newest unseen automatic row to show its popup.
+CREATE TABLE IF NOT EXISTS notification_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_date TEXT NOT NULL,        -- YYYY-MM-DD in the configured timezone
+  trigger_type TEXT NOT NULL,    -- 'scheduled' | 'catchup' | 'manual'
+  started_at TEXT,
+  finished_at TEXT,
+  checked INTEGER DEFAULT 0,
+  notified INTEGER DEFAULT 0,
+  email_sent INTEGER DEFAULT 0,
+  email_failed INTEGER DEFAULT 0,
+  sms_sent INTEGER DEFAULT 0,
+  sms_failed INTEGER DEFAULT 0,
+  recipients TEXT,               -- JSON: who was contacted and with what result
+  error TEXT,
+  seen INTEGER DEFAULT 0         -- 0 = popup not shown to admin yet
 );
 
 CREATE TABLE IF NOT EXISTS calibrations (
@@ -103,6 +124,10 @@ addColumnIfMissing('response_token', 'response_token TEXT');
 addColumnIfMissing('customer_response', 'customer_response TEXT');
 addColumnIfMissing('response_note', 'response_note TEXT');
 addColumnIfMissing('response_at', 'response_at TEXT');
+// Survey / Lab / Drones — set on the Add Equipment form, shown on the
+// dashboard. Left NULL on rows added before this column existed; those show
+// as "—" until the item is edited.
+addColumnIfMissing('company_category', 'company_category TEXT');
 
 // Same safety net, but for the calibrations table (new repair fields).
 const calibrationCols = db.prepare("PRAGMA table_info(calibrations)").all().map(c => c.name);
@@ -121,6 +146,10 @@ addCalibrationColumnIfMissing('repair_description', 'repair_description TEXT');
 // the table without it. NOTE: 'model' is now a genuine, permanent field (see
 // addColumnIfMissing above) — any existing model data is simply kept as-is,
 // not folded into equipment_type like an earlier migration used to do.
+//
+// IMPORTANT: this rebuild lists every column explicitly, so any column added
+// above must also be added here — otherwise a database old enough to still
+// have 'notes' would silently lose it during the rebuild.
 if (equipmentCols.includes('notes')) {
   db.exec('PRAGMA foreign_keys = OFF');
   const migrate = db.transaction(() => {
@@ -128,6 +157,7 @@ if (equipmentCols.includes('notes')) {
       CREATE TABLE equipment_new (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         customer_id INTEGER NOT NULL,
+        company_category TEXT,
         equipment_type TEXT,
         brand TEXT,
         model TEXT,
@@ -151,12 +181,12 @@ if (equipmentCols.includes('notes')) {
 
     db.exec(`
       INSERT INTO equipment_new
-        (id, customer_id, equipment_type, brand, model, serial_number, sold_by_us,
+        (id, customer_id, company_category, equipment_type, brand, model, serial_number, sold_by_us,
          purchase_date, warranty_period_months, last_calibration_date,
          next_calibration_date, status, last_notified_date, reminded_for_due_date,
          response_token, customer_response, response_note, response_at, created_at)
       SELECT
-        id, customer_id, equipment_type, brand, model, serial_number, sold_by_us,
+        id, customer_id, company_category, equipment_type, brand, model, serial_number, sold_by_us,
         purchase_date, warranty_period_months, last_calibration_date,
         next_calibration_date, status, last_notified_date, reminded_for_due_date,
         response_token, customer_response, response_note, response_at, created_at
@@ -205,15 +235,15 @@ if (count === 0) {
     'INSERT INTO customers (name, company, phone, email) VALUES (?, ?, ?, ?)'
   );
   const insertEquipment = db.prepare(`
-    INSERT INTO equipment (customer_id, equipment_type, brand, serial_number, last_calibration_date, next_calibration_date, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO equipment (customer_id, company_category, equipment_type, brand, serial_number, last_calibration_date, next_calibration_date, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const c1 = insertCustomer.run('Lal Constructions', 'Lal Constructions', '703010152', '').lastInsertRowid;
   const c2 = insertCustomer.run('Survey Department', 'Survey Department', '', '').lastInsertRowid;
 
-  insertEquipment.run(c1, 'ATB4A', 'Topcon', 'WP193069', '2026-01-07', '2026-07-07', 'Pending');
-  insertEquipment.run(c2, 'Sprinter 150m', 'Leica', '2118744', '2025-11-04', '2026-05-04', 'Overdue');
+  insertEquipment.run(c1, 'Survey', 'ATB4A', 'Topcon', 'WP193069', '2026-01-07', '2026-07-07', 'Pending');
+  insertEquipment.run(c2, 'Survey', 'Sprinter 150m', 'Leica', '2118744', '2025-11-04', '2026-05-04', 'Overdue');
 }
 
 module.exports = db;

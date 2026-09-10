@@ -113,12 +113,130 @@
             <td><%= c.done %></td>
             <td><%= c.status || '—' %></td>
             <td><%= c.done_date || '—' %></td>
-            <td><a href="/calibrations/<%= c.id %>/edit" class="btn small secondary">Edit</a></td>
+            <td class="text-nowrap">
+              <a href="/calibrations/<%= c.id %>/edit" class="btn small secondary">Edit</a>
+              <!-- Opens the QR panel for this instrument. Every row shows the
+                   same code on purpose — the QR identifies the equipment, not
+                   an individual service record. -->
+              <% if (qrImage) { %>
+                <button type="button" class="btn small qr" onclick="openQrModal()" title="QR code for <%= equipment.serial_number %>">
+                  <i class="bi bi-qr-code"></i> QR
+                </button>
+              <% } %>
+            </td>
           </tr>
         <% }) %>
       </tbody>
     </table>
   <% } %>
 </div>
+
+<!-- QR panel, hidden until a QR button in the history table is clicked. -->
+<% if (qrImage) { %>
+  <div class="qr-modal-overlay" id="qrModal" onclick="if (event.target === this) closeQrModal()">
+    <div class="qr-modal" role="dialog" aria-modal="true" aria-label="QR code">
+      <div class="qr-modal-head">
+        <div class="detail-card-title" style="margin:0;">QR Code</div>
+        <button type="button" class="qr-modal-close" onclick="closeQrModal()" aria-label="Close">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <div class="qr-block">
+        <div class="qr-preview">
+          <img src="<%= qrImage %>" alt="QR code for <%= equipment.serial_number %>">
+          <div class="qr-caption"><%= equipment.serial_number || 'Equipment' %></div>
+        </div>
+        <div class="qr-info">
+          <p class="qr-text">
+            Print this code and stick it on the instrument. Scanning it with any phone
+            camera opens a read-only page with the full equipment details and every
+            calibration record logged against it — no login needed.
+          </p>
+          <div class="qr-url-row">
+            <input type="text" id="qrScanUrl" class="qr-url" value="<%= scanUrl %>" readonly>
+            <button type="button" class="btn small secondary" onclick="copyScanUrl()">
+              <i class="bi bi-clipboard"></i> Copy
+            </button>
+          </div>
+          <div class="qr-actions">
+            <a href="/equipment/<%= equipment.id %>/qr.png" class="btn small gold" download>
+              <i class="bi bi-download"></i> Download QR
+            </a>
+            <button type="button" class="btn small secondary" onclick="printQr()">
+              <i class="bi bi-printer"></i> Print Sticker
+            </button>
+            <a href="<%= scanUrl %>" target="_blank" rel="noopener" class="btn small secondary">
+              <i class="bi bi-box-arrow-up-right"></i> Preview Scan Page
+            </a>
+          </div>
+          <p class="hint qr-hint">
+            Phones must be on the same network as this server for the link to open.
+            If the address above says <code>localhost</code>, set <code>PUBLIC_BASE_URL</code> in your <code>.env</code>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<script>
+  function openQrModal() {
+    document.getElementById('qrModal').classList.add('is-open');
+  }
+
+  function closeQrModal() {
+    document.getElementById('qrModal').classList.remove('is-open');
+  }
+
+  // Esc closes the panel, matching what people expect from a dialog.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeQrModal();
+  });
+
+  function copyScanUrl() {
+    const field = document.getElementById('qrScanUrl');
+    field.select();
+    field.setSelectionRange(0, 99999); // iOS needs the explicit range
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(field.value);
+    } else {
+      document.execCommand('copy');
+    }
+  }
+
+  // Opens just the QR + serial number in a small window and sends it to the
+  // printer, so you get a clean sticker instead of the whole page.
+  function printQr() {
+    const serial = <%- JSON.stringify(equipment.serial_number || 'Equipment') %>;
+    const brand = <%- JSON.stringify([equipment.brand, equipment.model].filter(Boolean).join(' ')) %>;
+    const img = <%- JSON.stringify(qrImage || '') %>;
+
+    const win = window.open('', '_blank', 'width=420,height=560');
+    win.document.write(`
+      <html>
+        <head>
+          <title>QR — ${serial}</title>
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 24px; margin: 0; }
+            img { width: 260px; height: 260px; }
+            .serial { font-size: 20px; font-weight: 700; margin-top: 10px; }
+            .brand { font-size: 13px; color: #555; }
+            .co { font-size: 11px; color: #777; margin-top: 12px; letter-spacing: 1px; }
+          </style>
+        </head>
+        <body>
+          <img src="${img}" alt="QR">
+          <div class="serial">${serial}</div>
+          <div class="brand">${brand}</div>
+          <div class="co">SULECO (PVT) LTD &middot; SCAN FOR SERVICE HISTORY</div>
+        </body>
+      </html>
+    `);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 300);
+  }
+</script>
 
 <%- include('../partials/footer') %>

@@ -1,9 +1,24 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const db = require('../db');
+const {
+  ensureEquipmentToken, publicEquipmentUrl, qrPngBuffer, qrDataUrl, safeFileName,
+} = require('../utils/qr');
 
 // Warranty periods stay as a fixed list (unlikely to need user-added values).
 const WARRANTY_OPTIONS = [6, 12, 24, 30, 36, 42, 48];
+
+// The three business divisions an instrument can belong to. Kept as a fixed
+// list rather than a dropdown_options row: these are company divisions, not
+// free-form data the office should be adding to from a form.
+const COMPANY_CATEGORIES = ['Survey', 'Lab', 'Drones'];
+
+// Guard against a hand-crafted POST putting junk in the column. Anything not
+// in the list is stored as NULL, which the dashboard renders as "—".
+function resolveCompanyCategory(value) {
+  return COMPANY_CATEGORIES.includes(value) ? value : null;
+}
 
 // Equipment Type / Brand / Model are user-extendable — stored in the
 // dropdown_options table so anything added through the form is remembered
@@ -40,6 +55,7 @@ router.get('/new', (req, res) => {
     brands: getOptions('brand'),
     models: getOptions('model'),
     warrantyOptions: WARRANTY_OPTIONS,
+    companyCategories: COMPANY_CATEGORIES,
     username: req.session.username,
   });
 });
@@ -48,6 +64,10 @@ router.get('/new', (req, res) => {
 // "sold by us" / purchase date / warranty info (set per equipment item, not shared).
 router.post('/new', (req, res) => {
   const { customer_id } = req.body;
+
+  // One category per submission, applied to every item in the batch — unlike
+  // the per-item fields below, this comes in as a single value, not an array.
+  const company_category = resolveCompanyCategory(req.body.company_category);
 
   const toArray = (v) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
   const equipmentTypesInput = toArray(req.body.equipment_type);
@@ -61,16 +81,20 @@ router.post('/new', (req, res) => {
   const purchaseDates = toArray(req.body.purchase_date);
   const warrantyPeriods = toArray(req.body.warranty_period_months);
 
+  // response_token doubles as the QR scan key, so every new row gets one at
+  // insert time. (db.js also backfills older rows on startup, but generating
+  // it here means a brand-new item can have its QR printed immediately.)
   const insert = db.prepare(`
     INSERT INTO equipment
-      (customer_id, equipment_type, brand, model, serial_number, sold_by_us, purchase_date, warranty_period_months, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (customer_id, company_category, equipment_type, brand, model, serial_number, sold_by_us, purchase_date, warranty_period_months, status, response_token)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const insertMany = db.transaction((rows) => {
     for (const row of rows) {
       insert.run(
         customer_id,
+        company_category,
         row.equipment_type,
         row.brand,
         row.model,
@@ -78,7 +102,8 @@ router.post('/new', (req, res) => {
         row.sold_by_us,
         row.purchase_date,
         row.warranty_period_months,
-        'Pending'
+        'Pending',
+        crypto.randomBytes(16).toString('hex')
       );
     }
   });
@@ -105,7 +130,7 @@ router.post('/new', (req, res) => {
   res.redirect('/');
 });
 
-router.get('/:id/view', (req, res) => {
+router.get('/:id/view', async (req, res) => {
   const equipment = db.prepare(`
     SELECT equipment.*, customers.name AS customer_name, customers.company AS customer_company,
            customers.phone AS customer_phone, customers.email AS customer_email
@@ -120,11 +145,49 @@ router.get('/:id/view', (req, res) => {
     SELECT * FROM calibrations WHERE equipment_id = ? ORDER BY id DESC
   `).all(req.params.id);
 
+  // QR block for this instrument — shown inline so it can be checked and
+  // printed straight from this page.
+  let qrImage = null;
+  let scanUrl = null;
+  try {
+    const token = ensureEquipmentToken(equipment.id);
+    scanUrl = publicEquipmentUrl(req, token);
+    qrImage = await qrDataUrl(scanUrl);
+  } catch (err) {
+    console.error('QR generation failed for equipment view:', err);
+  }
+
   res.render('equipment/view', {
     equipment,
     calibrations,
+    qrImage,
+    scanUrl,
     username: req.session.username,
   });
+});
+
+// Direct QR download for a piece of equipment (used by the equipment page and
+// available anywhere you have the equipment id rather than a calibration id).
+router.get('/:id/qr.png', async (req, res) => {
+  const equipment = db.prepare('SELECT id, serial_number FROM equipment WHERE id = ?').get(req.params.id);
+  if (!equipment) return res.status(404).send('Equipment not found.');
+
+  try {
+    const token = ensureEquipmentToken(equipment.id);
+    const url = publicEquipmentUrl(req, token);
+    const png = await qrPngBuffer(url);
+    const fileName = `QR_${safeFileName(equipment.serial_number, 'equipment')}.png`;
+
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader(
+      'Content-Disposition',
+      req.query.inline === '1' ? `inline; filename="${fileName}"` : `attachment; filename="${fileName}"`
+    );
+    res.send(png);
+  } catch (err) {
+    console.error('QR generation failed:', err);
+    res.status(500).send('Could not generate QR code.');
+  }
 });
 
 router.get('/:id/edit', (req, res) => {
@@ -138,12 +201,14 @@ router.get('/:id/edit', (req, res) => {
     brands: getOptions('brand'),
     models: getOptions('model'),
     warrantyOptions: WARRANTY_OPTIONS,
+    companyCategories: COMPANY_CATEGORIES,
     username: req.session.username,
   });
 });
 
 router.post('/:id/edit', (req, res) => {
   const { customer_id } = req.body;
+  const company_category = resolveCompanyCategory(req.body.company_category);
 
   // The edit form uses the same per-row array-style field names as the add
   // form (equipment_type[], sold_by_us[], etc.), even though there's only
@@ -167,10 +232,10 @@ router.post('/:id/edit', (req, res) => {
 
   db.prepare(`
     UPDATE equipment
-    SET customer_id = ?, equipment_type = ?, brand = ?, model = ?, serial_number = ?,
+    SET customer_id = ?, company_category = ?, equipment_type = ?, brand = ?, model = ?, serial_number = ?,
         sold_by_us = ?, purchase_date = ?, warranty_period_months = ?
     WHERE id = ?
-  `).run(customer_id, equipment_type, brand, model, serial_number, sold_by_us, purchase_date, warranty_period_months, req.params.id);
+  `).run(customer_id, company_category, equipment_type, brand, model, serial_number, sold_by_us, purchase_date, warranty_period_months, req.params.id);
 
   res.redirect('/');
 });

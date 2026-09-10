@@ -66,6 +66,71 @@
   <% } %>
 </div>
 
+<h2 style="margin-top:28px;">Automatic Run History</h2>
+<p class="subtitle">
+  Proof that the scheduled job fired. It is set to run daily at
+  <strong><%= dailyRunTime %></strong> (<%= timezone %>).
+  A <span class="badge badge-amber">catch-up</span> row means the app was not running at that
+  exact time (PC off or asleep), so it ran as soon as it started up instead.
+</p>
+
+<% if (!runs || runs.length === 0) { %>
+  <div class="empty-state">No sweeps have run yet.</div>
+<% } else { %>
+<table>
+  <thead>
+    <tr>
+      <th>Run Date</th>
+      <th>Finished At</th>
+      <th>Trigger</th>
+      <th>Checked</th>
+      <th>Reminders Sent</th>
+      <th>Email</th>
+      <th>SMS</th>
+      <th>Recipients</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% runs.forEach(run => { %>
+      <tr>
+        <td><%= run.run_date %></td>
+        <td><%= run.finished_at || '(still running)' %></td>
+        <td>
+          <% if (run.trigger_type === 'scheduled') { %>
+            <span class="badge badge-green">automatic</span>
+          <% } else if (run.trigger_type === 'catchup') { %>
+            <span class="badge badge-amber">catch-up</span>
+          <% } else { %>
+            <span class="badge badge-grey">manual</span>
+          <% } %>
+        </td>
+        <td><%= run.checked %></td>
+        <td><strong><%= run.notified %></strong></td>
+        <td>
+          <%= run.email_sent %> sent<% if (run.email_failed > 0) { %>,
+          <span style="color:var(--red);"><%= run.email_failed %> failed</span><% } %>
+        </td>
+        <td>
+          <%= run.sms_sent %> sent<% if (run.sms_failed > 0) { %>,
+          <span style="color:var(--red);"><%= run.sms_failed %> failed</span><% } %>
+        </td>
+        <td>
+          <% if (run.error) { %>
+            <span class="badge badge-red">error</span> <span class="hint"><%= run.error %></span>
+          <% } else if (run.recipientList.length === 0) { %>
+            <span class="hint">nothing due</span>
+          <% } else { %>
+            <span class="hint"><%= run.recipientList.map(r => r.renamed ? r.customer + ' (sent as ' + r.sentAs + ')' : r.customer).join(', ') %></span>
+          <% } %>
+        </td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<% } %>
+
+<h2 style="margin-top:28px;">Individual Messages</h2>
+
 <% if (logs.length === 0) { %>
   <div class="empty-state">No notifications have been sent yet.</div>
 <% } else { %>
@@ -84,8 +149,12 @@
     <% logs.forEach(l => { %>
       <tr>
         <td><%= l.sent_at %></td>
-        <td><%= l.customer_name %></td>
-        <td><%= l.channel %></td>
+        <td>
+          <%= l.current_customer_name || l.customer_name %>
+          <% if (l.current_customer_name && l.customer_name && l.current_customer_name !== l.customer_name) { %>
+            <br><span class="hint">sent as <%= l.customer_name %></span>
+          <% } %>
+        </td>        <td><%= l.channel %></td>
         <td><%= l.target || '—' %></td>
         <td>
           <span class="badge <%= l.status === 'sent' ? 'badge-green' : (l.status === 'failed' ? 'badge-red' : 'badge-grey') %>">

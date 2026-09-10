@@ -1,7 +1,9 @@
-<%- include('../partials/header', { title: 'Calibrations', username }) %>
+<%- include('../partials/header', { title: 'Calibrations', username, bodyClass: 'calibrations-page' }) %>
 
-<h1>Calibrations</h1>
-<p class="subtitle">All logged calibration records.</p>
+<h1>Services</h1>
+<p class="subtitle">
+  All logged calibration records.
+</p>
 
 <% if (typeof flash !== 'undefined' && flash) { %>
   <div id="flashAlert" class="alert alert-success alert-dismissible fade show d-flex align-items-center gap-2" role="alert">
@@ -72,73 +74,22 @@
 <div id="noResultsMsg" class="empty-state" style="display:none;">No rows match your filter.</div>
 <% } %>
 
+<script src="/js/table-tools.js"></script>
 <script>
-  // ---- Instant client-side filter ----
-  const quickFilter = document.getElementById('quickFilter');
-  const calibrationsTable = document.getElementById('calibrationsTable');
-  const noResultsMsg = document.getElementById('noResultsMsg');
-
-  if (quickFilter && calibrationsTable) {
-    const rows = Array.from(calibrationsTable.querySelectorAll('tbody tr'));
-
-    quickFilter.addEventListener('input', () => {
-      const q = quickFilter.value.trim().toLowerCase();
-      let visibleCount = 0;
-      rows.forEach((row) => {
-        const matches = row.textContent.toLowerCase().includes(q);
-        row.style.display = matches ? '' : 'none';
-        if (matches) visibleCount++;
-      });
-      calibrationsTable.style.display = visibleCount === 0 ? 'none' : '';
-      noResultsMsg.style.display = visibleCount === 0 ? 'block' : 'none';
-    });
-  }
-
-  // ---- Sortable columns ----
-  if (calibrationsTable) {
-    const tbody = calibrationsTable.querySelector('tbody');
-    const headers = calibrationsTable.querySelectorAll('th[data-sort]');
-
-    headers.forEach((th, colIndex) => {
-      th.style.cursor = 'pointer';
-      let ascending = true;
-
-      th.addEventListener('click', () => {
-        const type = th.dataset.sort;
-        const rows = Array.from(tbody.querySelectorAll('tr'));
-
-        rows.sort((a, b) => {
-          const cellA = a.children[colIndex];
-          const cellB = b.children[colIndex];
-          const valA = (cellA.dataset.sortValue !== undefined ? cellA.dataset.sortValue : cellA.textContent).trim();
-          const valB = (cellB.dataset.sortValue !== undefined ? cellB.dataset.sortValue : cellB.textContent).trim();
-
-          let cmp;
-          if (type === 'date') {
-            if (!valA && !valB) cmp = 0;
-            else if (!valA) cmp = 1;
-            else if (!valB) cmp = -1;
-            else cmp = new Date(valA) - new Date(valB);
-          } else {
-            cmp = valA.localeCompare(valB, undefined, { sensitivity: 'base' });
-          }
-          return ascending ? cmp : -cmp;
-        });
-
-        rows.forEach((row) => tbody.appendChild(row));
-        ascending = !ascending;
-      });
-    });
-  }
+  // Filter + column sorting + 25-rows-per-page pagination for #calibrationsTable.
+  // All of the logic lives in /public/js/table-tools.js so every list page
+  // behaves the same way.
+  initTableTools('calibrationsTable', { pageSize: 25 });
 
   // ---- Auto-dismiss the success flash message after a few seconds ----
-  const flashAlert = document.getElementById('flashAlert');
-  if (flashAlert && window.bootstrap) {
-    setTimeout(() => {
-      const alertInstance = bootstrap.Alert.getOrCreateInstance(flashAlert);
-      alertInstance.close();
-    }, 5000);
-  }
+  window.addEventListener('load', () => {
+    const flashAlert = document.getElementById('flashAlert');
+    if (flashAlert && window.bootstrap) {
+      setTimeout(() => {
+        bootstrap.Alert.getOrCreateInstance(flashAlert).close();
+      }, 5000);
+    }
+  });
 </script>
 
 <%- include('../partials/footer') %>

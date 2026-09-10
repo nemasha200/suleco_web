@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title><%= equipment.serial_number || 'Equipment' %> · Suleco Calibration Record</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/css/public-view.css">
+</head>
+<body>
+
+<header class="pv-topbar">
+  <img src="/images/suleco-logo-nav.png" alt="Suleco" class="pv-logo">
+  <div class="pv-topbar-text">
+    <div class="pv-topbar-title">Calibration <span>Record</span></div>
+    <div class="pv-topbar-sub">Suleco (Pvt) Ltd</div>
+  </div>
+</header>
+
+<main class="pv-wrap">
+
+  <!-- ===================== 1. CALIBRATION DATES ===================== -->
+  <section class="pv-card">
+    <h2 class="pv-card-title"><i class="bi bi-calendar-check"></i> Calibration</h2>
+    <div class="pv-grid">
+      <div class="pv-field">
+        <div class="pv-label">Calibration Done Date</div>
+        <div class="pv-value"><%= equipment.last_calibration_date || 'Not recorded' %></div>
+      </div>
+      <div class="pv-field">
+        <div class="pv-label">Next Calibration Date</div>
+        <div class="pv-value pv-value-strong"><%= equipment.next_calibration_date || 'Not scheduled' %></div>
+      </div>
+    </div>
+    <% if (equipment.next_calibration_date) { %>
+      <div style="margin-top:14px;">
+        <span class="pv-badge <%= badge.className %>"><%= badge.label %></span>
+      </div>
+    <% } %>
+  </section>
+
+  <!-- ===================== 2. EQUIPMENT DETAILS ===================== -->
+  <section class="pv-card">
+    <h2 class="pv-card-title"><i class="bi bi-tools"></i> Equipment Details</h2>
+    <div class="pv-grid">
+      <div class="pv-field">
+        <div class="pv-label">Equipment Type</div>
+        <div class="pv-value"><%= equipment.equipment_type || '—' %></div>
+      </div>
+      <div class="pv-field">
+        <div class="pv-label">Brand</div>
+        <div class="pv-value"><%= equipment.brand || '—' %></div>
+      </div>
+      <div class="pv-field">
+        <div class="pv-label">Model</div>
+        <div class="pv-value"><%= equipment.model || '—' %></div>
+      </div>
+      <div class="pv-field">
+        <div class="pv-label">Serial Number</div>
+        <div class="pv-value"><%= equipment.serial_number || '—' %></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 3. COMPANY / CLIENT DETAILS ===================== -->
+  <section class="pv-card">
+    <h2 class="pv-card-title"><i class="bi bi-building"></i> Company Details</h2>
+    <div class="pv-grid">
+      <div class="pv-field">
+        <div class="pv-label">Customer Name</div>
+        <div class="pv-value"><%= equipment.customer_name || '—' %></div>
+      </div>
+      <div class="pv-field">
+        <div class="pv-label">Company Address</div>
+        <div class="pv-value"><%= equipment.customer_company || '—' %></div>
+      </div>
+      <div class="pv-field">
+        <div class="pv-label">Phone</div>
+        <div class="pv-value">
+          <% if (equipment.customer_phone) { %>
+            <a href="tel:<%= equipment.customer_phone %>"><%= equipment.customer_phone %></a>
+          <% } else { %>—<% } %>
+        </div>
+      </div>
+      <div class="pv-field">
+        <div class="pv-label">Email</div>
+        <div class="pv-value pv-value-break">
+          <% if (equipment.customer_email) { %>
+            <a href="mailto:<%= equipment.customer_email %>"><%= equipment.customer_email %></a>
+          <% } else { %>—<% } %>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== SULECO CONTACT ===================== -->
+  <section class="pv-contact">
+    <div class="pv-contact-title">Book a calibration</div>
+    <a class="pv-contact-line" href="tel:0112875050"><i class="bi bi-telephone-fill"></i> +94 112875050</a>
+    <a class="pv-contact-line" href="mailto:sales@suleco.lk"><i class="bi bi-envelope-fill"></i> sales@suleco.lk</a>
+  </section>
+
+  <p class="pv-foot">
+    Read-only record &middot; &copy; <%= new Date().getFullYear() %> Suleco (Pvt) Ltd
+  </p>
+</main>
+
+</body>
+</html>

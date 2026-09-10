@@ -1,4 +1,4 @@
-<%- include('partials/header', { title: 'Dashboard — Calibration Tracker', username }) %>
+<%- include('partials/header', { title: 'Dashboard — Calibration Tracker', username, bodyClass: 'has-page-bg', activeNav: 'dashboard' }) %>
 
 <h1>Dashboard</h1>
 <p class="subtitle">Upcoming and overdue calibrations, sorted soonest first.</p>
@@ -9,6 +9,122 @@
     <div><%= flash %></div>
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
   </div>
+<% } %>
+
+<!-- Automation status: is the daily job alive, what did it last do, when next. -->
+<section class="auto-status auto-status--<%= automation.tone %>">
+  <span class="auto-status__dot" aria-hidden="true"></span>
+
+  <div class="auto-status__body">
+    <div class="auto-status__headline">
+      <%= automation.headline %>
+      <% if (automation.wasCatchUp) { %>
+        <span class="auto-status__tag" title="The app was not running at <%= automation.runTimeLabel %>, so it sent the reminders as soon as it started up.">ran late</span>
+      <% } %>
+    </div>
+    <div class="auto-status__detail"><%= automation.detail %></div>
+  </div>
+
+  <div class="auto-status__meta">
+    <div class="auto-status__next">Next check <strong><%= automation.nextRun %></strong></div>
+    <a href="/notifications" class="auto-status__link">See what was sent</a>
+  </div>
+</section>
+
+<!-- ===== Proof-of-send popup: appears once, right after an automatic run ===== -->
+<% if (autoRun) { %>
+<div class="modal fade" id="autoRunModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header" style="background:var(--navy); color:#fff;">
+        <h5 class="modal-title">
+          <i class="bi bi-send-check"></i>
+          Automatic reminders sent
+          <% if (autoRun.trigger_type === 'catchup') { %>
+            <span class="badge badge-amber" style="vertical-align:middle;">catch-up run</span>
+          <% } %>
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <p class="mb-3">
+          The scheduled job ran on <strong><%= autoRun.run_date %></strong>
+          and finished at <strong><%= autoRun.finished_at %></strong>.
+          No one had to press a button.
+        </p>
+
+        <div class="row g-2 mb-3 text-center">
+          <div class="col-6 col-md-3">
+            <div class="stat-card"><div class="num"><%= autoRun.checked %></div><div class="label">Items checked</div></div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="stat-card"><div class="num"><%= autoRun.notified %></div><div class="label">Reminders sent</div></div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="stat-card"><div class="num"><%= autoRun.email_sent %></div><div class="label">Emails delivered</div></div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="stat-card"><div class="num"><%= autoRun.sms_sent %></div><div class="label">SMS delivered</div></div>
+          </div>
+        </div>
+
+        <% if (autoRun.email_failed > 0 || autoRun.sms_failed > 0) { %>
+          <div class="alert alert-warning py-2">
+            <i class="bi bi-exclamation-triangle"></i>
+            <%= autoRun.email_failed %> email(s) and <%= autoRun.sms_failed %> SMS failed.
+            Failed emails are retried automatically on the next run.
+          </div>
+        <% } %>
+
+        <% if (autoRun.error) { %>
+          <div class="alert alert-danger py-2"><i class="bi bi-x-octagon"></i> <%= autoRun.error %></div>
+        <% } %>
+
+        <% if (autoRun.recipientList.length === 0) { %>
+          <div class="empty-state" style="margin:0;">
+            Nothing was due within the reminder window, so no messages needed to be sent.
+            The job still ran — that is what this record proves.
+          </div>
+        <% } else { %>
+          <div class="hint mb-2" style="font-weight:700; text-transform:uppercase; letter-spacing:.04em; font-size:12px;">
+            Who was contacted
+          </div>
+          <table>
+            <thead>
+              <tr><th>Customer</th><th>Equipment</th><th>Due</th><th>Email</th><th>SMS</th></tr>
+            </thead>
+            <tbody>
+              <% autoRun.recipientList.forEach(r => { %>
+                <tr>
+                                    <td>
+                    <%= r.customer %>
+                    <% if (r.renamed) { %><br><span class="hint">sent as <%= r.sentAs %></span><% } %>
+                  </td>
+                  <td><%= r.equipment %><% if (r.serial) { %><br><span class="hint">S/N <%= r.serial %></span><% } %></td>
+                  <td><%= r.due %><br><span class="hint"><%= r.daysLeft < 0 ? Math.abs(r.daysLeft) + 'd overdue' : 'in ' + r.daysLeft + 'd' %></span></td>
+                  <td>
+                    <span class="badge <%= r.email.status.startsWith('sent') ? 'badge-green' : (r.email.status === 'failed' ? 'badge-red' : 'badge-grey') %>"><%= r.email.status %></span>
+                    <% if (r.email.target) { %><br><span class="hint"><%= r.email.target %></span><% } %>
+                  </td>
+                  <td>
+                    <span class="badge <%= r.sms.status.startsWith('sent') ? 'badge-green' : (r.sms.status === 'failed' ? 'badge-red' : 'badge-grey') %>"><%= r.sms.status %></span>
+                    <% if (r.sms.target) { %><br><span class="hint"><%= r.sms.target %></span><% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+
+      <div class="modal-footer">
+        <a href="/notifications" class="btn secondary"><i class="bi bi-bell"></i> Full notification log</a>
+        <button type="button" class="btn gold" data-bs-dismiss="modal">Got it</button>
+      </div>
+    </div>
+  </div>
+</div>
 <% } %>
 
 <div class="row g-3 mb-4">
@@ -77,6 +193,7 @@
   <thead>
     <tr>
       <th data-sort="text">Customer <i class="bi bi-arrow-down-up sort-icon"></i></th>
+      <th data-sort="text">Category <i class="bi bi-arrow-down-up sort-icon"></i></th>
       <th data-sort="text">Equipment Type <i class="bi bi-arrow-down-up sort-icon"></i></th>
       <th data-sort="text">Brand <i class="bi bi-arrow-down-up sort-icon"></i></th>
       <th data-sort="text">Model <i class="bi bi-arrow-down-up sort-icon"></i></th>
@@ -90,6 +207,7 @@
     <% equipment.forEach(e => { %>
       <tr>
         <td><%= e.customer_name %><br><span class="hint"><%= e.customer_phone || '' %></span></td>
+        <td><%= e.company_category || '—' %></td>
         <td><%= e.equipment_type || '—' %></td>
         <td><%= e.brand || '—' %></td>
         <td><%= e.model || '—' %></td>
@@ -111,44 +229,144 @@
   </tbody>
 </table>
 <div id="noResultsMsg" class="empty-state" style="display:none;">No rows match your filter.</div>
+
+<nav aria-label="Equipment table pages" class="mt-3">
+  <ul class="pagination justify-content-start mb-2" id="tablePagination"></ul>
+</nav>
+<div id="pageInfo" class="hint mb-4"></div>
 <% } %>
 
 <script>
-  // ---- Instant client-side filter ----
+  // ---- Filter, sort and pagination ----
+  // These three have to share state. Pagination slices the FILTERED list, not
+  // the whole table, or filtering to 3 rows would still show "page 4 of 9".
+  // Sorting reorders the master list, then the filter and page slice are
+  // recomputed from it.
+  const PAGE_SIZE = 10;
+
   const quickFilter = document.getElementById('quickFilter');
   const dashboardTable = document.getElementById('dashboardTable');
   const noResultsMsg = document.getElementById('noResultsMsg');
+  const paginationEl = document.getElementById('tablePagination');
+  const pageInfoEl = document.getElementById('pageInfo');
 
-  if (quickFilter && dashboardTable) {
-    const rows = Array.from(dashboardTable.querySelectorAll('tbody tr'));
-
-    quickFilter.addEventListener('input', () => {
-      const q = quickFilter.value.trim().toLowerCase();
-      let visibleCount = 0;
-      rows.forEach((row) => {
-        const matches = row.textContent.toLowerCase().includes(q);
-        row.style.display = matches ? '' : 'none';
-        if (matches) visibleCount++;
-      });
-      dashboardTable.style.display = visibleCount === 0 ? 'none' : '';
-      noResultsMsg.style.display = visibleCount === 0 ? 'block' : 'none';
-    });
-  }
-
-  // ---- Sortable columns ----
   if (dashboardTable) {
     const tbody = dashboardTable.querySelector('tbody');
-    const headers = dashboardTable.querySelectorAll('th[data-sort]');
+    const allRows = Array.from(tbody.querySelectorAll('tr'));
+    let filteredRows = allRows.slice();
+    let currentPage = 1;
 
+    function applyFilter() {
+      const q = quickFilter ? quickFilter.value.trim().toLowerCase() : '';
+      filteredRows = q
+        ? allRows.filter((row) => row.textContent.toLowerCase().includes(q))
+        : allRows.slice();
+    }
+
+    function render() {
+      const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+      if (currentPage > totalPages) currentPage = totalPages;
+
+      // Hide everything, then show only this page's slice. Simpler and less
+      // error-prone than tracking which rows were visible last time.
+      allRows.forEach((row) => { row.style.display = 'none'; });
+
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const pageRows = filteredRows.slice(start, start + PAGE_SIZE);
+      pageRows.forEach((row) => { row.style.display = ''; });
+
+      const isEmpty = filteredRows.length === 0;
+      dashboardTable.style.display = isEmpty ? 'none' : '';
+      if (noResultsMsg) noResultsMsg.style.display = isEmpty ? 'block' : 'none';
+
+      if (pageInfoEl) {
+        pageInfoEl.textContent = isEmpty
+          ? ''
+          : `Showing ${start + 1}–${start + pageRows.length} of ${filteredRows.length}`;
+      }
+
+      renderPagination(totalPages);
+    }
+
+    function renderPagination(totalPages) {
+      if (!paginationEl) return;
+      paginationEl.innerHTML = '';
+
+      // Follows Bootstrap's own pagination markup: active and disabled items
+      // use <span> rather than <a>, so they can't be clicked or tabbed to.
+      // Only real, navigable pages get an anchor.
+      const addItem = (label, page, opts = {}) => {
+        const li = document.createElement('li');
+        li.className = 'page-item'
+          + (opts.disabled ? ' disabled' : '')
+          + (opts.active ? ' active' : '');
+
+        if (opts.disabled || opts.active) {
+          const span = document.createElement('span');
+          span.className = 'page-link';
+          span.textContent = label;
+
+          if (opts.active) {
+            // Screen readers announce which page you're on; sighted users
+            // just see the highlighted button.
+            const sr = document.createElement('span');
+            sr.className = 'visually-hidden';
+            sr.textContent = '(current)';
+            span.appendChild(sr);
+          }
+
+          li.appendChild(span);
+        } else {
+          const a = document.createElement('a');
+          a.className = 'page-link';
+          a.href = '#';
+          a.textContent = label;
+          a.addEventListener('click', (e) => {
+            e.preventDefault();
+            currentPage = page;
+            render();
+            dashboardTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+          li.appendChild(a);
+        }
+
+        paginationEl.appendChild(li);
+      };
+
+      addItem('Previous', currentPage - 1, { disabled: currentPage === 1 });
+
+      // Show first, last, and two either side of the current page. With 40
+      // pages, printing all 40 buttons would wrap onto three lines.
+      let lastPrinted = 0;
+      for (let p = 1; p <= totalPages; p++) {
+        const nearCurrent = Math.abs(p - currentPage) <= 2;
+        if (p !== 1 && p !== totalPages && !nearCurrent) continue;
+        if (lastPrinted && p - lastPrinted > 1) addItem('…', 0, { disabled: true });
+        addItem(String(p), p, { active: p === currentPage });
+        lastPrinted = p;
+      }
+
+      addItem('Next', currentPage + 1, { disabled: currentPage === totalPages });
+    }
+
+    if (quickFilter) {
+      quickFilter.addEventListener('input', () => {
+        applyFilter();
+        currentPage = 1;      // a new search always starts at the top
+        render();
+      });
+    }
+
+    // Sortable columns
+    const headers = dashboardTable.querySelectorAll('th[data-sort]');
     headers.forEach((th, colIndex) => {
       th.style.cursor = 'pointer';
       let ascending = true;
 
       th.addEventListener('click', () => {
         const type = th.dataset.sort;
-        const rows = Array.from(tbody.querySelectorAll('tr'));
 
-        rows.sort((a, b) => {
+        allRows.sort((a, b) => {
           const cellA = a.children[colIndex];
           const cellB = b.children[colIndex];
           const valA = (cellA.dataset.sortValue !== undefined ? cellA.dataset.sortValue : cellA.textContent).trim();
@@ -167,20 +385,40 @@
           return ascending ? cmp : -cmp;
         });
 
-        rows.forEach((row) => tbody.appendChild(row));
+        // Put the rows back in the new order, then recompute what's visible.
+        allRows.forEach((row) => tbody.appendChild(row));
+        applyFilter();
+        currentPage = 1;
+        render();
         ascending = !ascending;
       });
     });
+
+    render();
   }
 
-  // ---- Auto-dismiss the success flash message after a few seconds ----
-  const flashAlert = document.getElementById('flashAlert');
-  if (flashAlert && window.bootstrap) {
-    setTimeout(() => {
-      const alertInstance = bootstrap.Alert.getOrCreateInstance(flashAlert);
-      alertInstance.close();
-    }, 5000);
-  }
+  // ---- Bootstrap-dependent bits ----
+  // Bootstrap's JS bundle is loaded at the bottom of the page (in the footer),
+  // which is AFTER this script runs. Waiting for the window 'load' event means
+  // the bundle is guaranteed to be parsed by the time we touch it. Without
+  // this, window.bootstrap is undefined here and nothing below ever fires.
+  window.addEventListener('load', () => {
+    if (!window.bootstrap) return;
+
+    // Pop the proof-of-send dialog open right away.
+    const autoRunModalEl = document.getElementById('autoRunModal');
+    if (autoRunModalEl) {
+      bootstrap.Modal.getOrCreateInstance(autoRunModalEl).show();
+    }
+
+    // Auto-dismiss the success flash message after a few seconds.
+    const flashAlert = document.getElementById('flashAlert');
+    if (flashAlert) {
+      setTimeout(() => {
+        bootstrap.Alert.getOrCreateInstance(flashAlert).close();
+      }, 5000);
+    }
+  });
 </script>
 
 <%- include('partials/footer') %>

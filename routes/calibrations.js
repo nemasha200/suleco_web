@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { syncEquipmentCalibrationDates } = require('../utils/syncEquipmentCalibration');
+const {
+  ensureEquipmentToken, publicEquipmentUrl, qrPngBuffer, safeFileName,
+} = require('../utils/qr');
 
 // Calibration Description is a user-extendable dropdown, same pattern as
 // Equipment Type / Brand / Model on the equipment form — stored in the
@@ -145,6 +148,50 @@ router.post('/new', (req, res) => {
 
   req.session.flash = 'Calibration record saved.';
   res.redirect('/calibrations/new');
+});
+
+// ---------------------------------------------------------------------------
+// QR code download — the button in the Action column of the calibrations list.
+//
+// The QR is generated per EQUIPMENT (not per calibration row), because what a
+// technician wants when scanning a sticker on an instrument is that
+// instrument's whole story: its details plus every calibration ever logged
+// against it. Two calibration rows for the same serial number therefore
+// produce the same QR — which is correct, they're the same physical machine.
+// ---------------------------------------------------------------------------
+router.get('/:id/qr.png', async (req, res) => {
+  const calibration = db.prepare(`
+    SELECT calibrations.id, calibrations.equipment_id,
+           equipment.serial_number, equipment.equipment_type, equipment.brand
+    FROM calibrations
+    JOIN equipment ON equipment.id = calibrations.equipment_id
+    WHERE calibrations.id = ?
+  `).get(req.params.id);
+
+  if (!calibration) return res.status(404).send('Calibration record not found.');
+
+  try {
+    const token = ensureEquipmentToken(calibration.equipment_id);
+    if (!token) return res.status(404).send('Equipment not found.');
+
+    const url = publicEquipmentUrl(req, token);
+    const png = await qrPngBuffer(url);
+
+    const fileName = `QR_${safeFileName(calibration.serial_number, 'equipment')}.png`;
+
+    res.setHeader('Content-Type', 'image/png');
+    // ?inline=1 shows the image in the browser instead of downloading it —
+    // used by the preview box on the equipment page. The plain URL (what the
+    // Action-column button uses) always downloads.
+    res.setHeader(
+      'Content-Disposition',
+      req.query.inline === '1' ? `inline; filename="${fileName}"` : `attachment; filename="${fileName}"`
+    );
+    res.send(png);
+  } catch (err) {
+    console.error('QR generation failed:', err);
+    res.status(500).send('Could not generate QR code.');
+  }
 });
 
 // Edit an existing calibration record

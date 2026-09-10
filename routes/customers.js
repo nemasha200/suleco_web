@@ -2,6 +2,27 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
+// Must match the scheduler's window, so "will this customer still get a
+// reminder for this due date?" is answered the same way in both places.
+const REMIND_DAYS_BEFORE = Number(process.env.REMIND_DAYS_BEFORE) || 7;
+
+// When a customer's phone or email changes, any reminder already sent for
+// their current due dates went to the OLD address. The sweep stamps
+// reminded_for_due_date after a successful send and skips that instrument
+// until the due date changes — so without this, correcting a typo'd address
+// would never produce a corrected reminder.
+//
+// Clearing the stamp puts those instruments back in the queue. Only ones
+// still inside the reminder window are cleared; instruments due months out
+// are untouched, since their reminder hasn't been sent yet anyway.
+const requeueDueReminders = db.prepare(`
+  UPDATE equipment
+  SET reminded_for_due_date = NULL
+  WHERE customer_id = ?
+    AND next_calibration_date IS NOT NULL
+    AND next_calibration_date <= date('now', '+' || ? || ' days')
+`);
+
 router.get('/', (req, res) => {
   const customers = db.prepare(`
     SELECT customers.*, COUNT(equipment.id) AS equipment_count
@@ -32,8 +53,27 @@ router.get('/:id/edit', (req, res) => {
 
 router.post('/:id/edit', (req, res) => {
   const { name, company, phone, email } = req.body;
+
+  // Read the old values BEFORE updating, so we can tell whether the contact
+  // details actually changed. Renaming a company shouldn't re-send anything.
+  const before = db.prepare('SELECT phone, email FROM customers WHERE id = ?').get(req.params.id);
+  if (!before) return res.redirect('/customers');
+
   db.prepare('UPDATE customers SET name = ?, company = ?, phone = ?, email = ? WHERE id = ?')
     .run(name, company, phone, email, req.params.id);
+
+  const contactChanged =
+    (before.phone || '') !== (phone || '') ||
+    (before.email || '') !== (email || '');
+
+  if (contactChanged) {
+    const requeued = requeueDueReminders.run(req.params.id, REMIND_DAYS_BEFORE).changes;
+    if (requeued > 0) {
+      console.log(`Customer #${req.params.id} contact details changed — ${requeued} due/overdue instrument(s) re-queued for a fresh reminder.`);
+      req.session.flash = `Contact details updated. ${requeued} reminder${requeued === 1 ? '' : 's'} will be re-sent to the new details on the next run.`;
+    }
+  }
+
   res.redirect('/customers');
 });
 
