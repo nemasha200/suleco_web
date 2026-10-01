@@ -1,0 +1,30 @@
+    </main>
+
+    <div class="console-foot">
+      &copy; 2026 Technical Tracker · Suleco (Pvt) Ltd
+      <span>Mon – Fri · 9:00 AM – 6:00 PM · sales@suleco.lk</span>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // On a narrow screen the sidebar is off-canvas; the burger slides it in.
+  (function () {
+    const side = document.getElementById('consoleSide');
+    const burger = document.getElementById('consoleBurger');
+    if (!side || !burger) return;
+
+    burger.addEventListener('click', () => side.classList.toggle('open'));
+
+    // Tapping the content area closes it again, so you're never stuck behind
+    // the overlay on a phone.
+    document.querySelector('.console-main').addEventListener('click', (e) => {
+      if (!side.classList.contains('open')) return;
+      if (e.target.closest('#consoleBurger')) return;
+      side.classList.remove('open');
+    });
+  })();
+</script>
+</body>
+</html>

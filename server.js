@@ -14,6 +14,7 @@ const equipmentRoutes = require('./routes/equipment');
 const calibrationRoutes = require('./routes/calibrations');
 const publicRoutes = require('./routes/public');
 const searchRoutes = require('./routes/search');
+const notificationRoutes = require('./routes/notifications'); // ← NEW LINE
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -42,6 +43,7 @@ app.use('/', requireLogin, dashboardRoutes);
 app.use('/customers', requireLogin, customerRoutes);
 app.use('/equipment', requireLogin, equipmentRoutes);
 app.use('/calibrations', requireLogin, calibrationRoutes);
+app.use('/notifications', requireLogin, notificationRoutes); // ← NEW LINE
 app.use('/search', requireLogin, searchRoutes);
 
 // Listening on 0.0.0.0 (rather than just localhost) is what lets a phone on

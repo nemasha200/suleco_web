@@ -1,119 +1,267 @@
-<%- include('../partials/header', { title: 'Customers — Calibration Tracker', username, bodyClass: 'customers-page' }) %>
+<%- include('../partials/console-header', { 
+  title: 'Customers — Technical Tracker', 
+  activeNav: 'customers',
+  alertCount: typeof alertCount !== 'undefined' ? alertCount : 0,
+  username: typeof username !== 'undefined' ? username : 'admin',
+  q: typeof q !== 'undefined' ? q : ''
+}) %>
 
-<h1>Customers</h1>
-<p class="subtitle">All client records.</p>
+<!-- ===== PAGE HEADER ===== -->
+<div class="c-deptbar">
+  <div>
+    <div class="c-deptbar__name">Customers</div>
+    <div class="c-deptbar__org">All client records</div>
+  </div>
+  <div class="c-deptbar__date" id="todayDate"></div>
+</div>
 
+<!-- ===== FLASH MESSAGE ===== -->
 <% if (typeof flash !== 'undefined' && flash) { %>
-  <div id="flashAlert" class="alert alert-success alert-dismissible fade show d-flex align-items-center gap-2" role="alert">
-    <i class="bi bi-check-circle-fill"></i>
-    <div><%= flash %></div>
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  <div class="c-auto" id="flashAlert">
+    <i class="bi bi-check-circle-fill" style="color: var(--c-green); font-size: 18px;"></i>
+    <div>
+      <div class="c-auto__headline"><%= flash %></div>
+    </div>
+    <button type="button" onclick="this.parentElement.remove()" style="background:none; border:0; color: var(--c-mute); cursor:pointer; font-size:18px; margin-left:auto;"><i class="bi bi-x"></i></button>
   </div>
 <% } %>
 
-<div class="actions-row">
-  <div></div>
-  <a href="/customers/new" class="btn gold"><i class="bi bi-person-plus-fill"></i> Add Customer</a>
+<!-- ===== ADD BUTTON ===== -->
+<div class="c-actions" style="margin-bottom: 18px;">
+  <a href="/customers/new" class="c-btn primary">
+    <i class="bi bi-person-plus-fill"></i> Add Customer
+  </a>
 </div>
 
-<%- include('../partials/searchbar') %>
+<!-- ===== MAIN CONTENT CARD ===== -->
+<div class="c-card">
+  <!-- Quick filter section -->
+  <% if (customers.length > 0) { %>
+    <div style="margin-bottom: 16px;">
+      <div style="position: relative;">
+        <i class="bi bi-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--c-mute); font-size: 14px;"></i>
+        <input type="text" id="quickFilter" placeholder="Quick filter this table…" style="
+          width: 100%;
+          border: 1px solid var(--c-line);
+          border-radius: 9px;
+          padding: 9px 12px 9px 38px;
+          font-size: 13px;
+          color: var(--c-text);
+        ">
+      </div>
+    </div>
+  <% } %>
 
-<% if (customers.length === 0) { %>
-  <div class="empty-state">No customers yet. <a href="/customers/new">Add your first one</a>.</div>
-<% } else { %>
+  <!-- Empty state -->
+  <% if (customers.length === 0) { %>
+    <div class="c-empty">
+      No customers yet. <a href="/customers/new" style="color: var(--c-blue); font-weight: 600;">Add your first customer</a>
+    </div>
+  <% } else { %>
+    <!-- Table -->
+    <div style="overflow-x: auto;">
+      <table class="c-table">
+        <thead>
+          <tr>
+            <th data-sort="text"><i class="bi bi-building"></i> Company Name</th>
+            <th data-sort="text"><i class="bi bi-geo-alt"></i> Address</th>
+            <th data-sort="text"><i class="bi bi-telephone"></i> Phone</th>
+            <th data-sort="text"><i class="bi bi-envelope"></i> Email</th>
+            <th data-sort="number"><i class="bi bi-box-seam"></i> Equipment</th>
+            <th style="text-align: left;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% customers.forEach(c => { %>
+            <tr>
+              <td><strong><%= c.name %></strong></td>
+              <td><%= c.company || '—' %></td>
+              <td>
+                <%= c.phone || '—' %>
+                <% if (c.phone2) { %><br><span style="font-size: 11px; color: var(--c-mute);"><%= c.phone2 %></span><% } %>
+              </td>
+              <td>
+                <%= c.email || '—' %>
+                <% if (c.email2) { %><br><span style="font-size: 11px; color: var(--c-mute);"><%= c.email2 %></span><% } %>
+              </td>
+              <td data-sort-value="<%= c.equipment_count || 0 %>">
+                <% if (c.equipment_count > 0) { %>
+                  <span class="c-pill green"><%= c.equipment_count %></span>
+                <% } else { %>
+                  <span style="color: var(--c-mute);">—</span>
+                <% } %>
+              </td>
+              <td>
+                <a href="/customers/<%= c.id %>/edit" class="c-btn" style="font-size: 12px; padding: 6px 10px; margin-right: 6px;">
+                  <i class="bi bi-pencil-square"></i> Edit
+                </a>
+                <form method="POST" action="/customers/<%= c.id %>/delete" style="display:inline;"
+                      data-confirm-delete="This customer and every equipment record belonging to them will be deleted.">
+                  <button type="submit" class="c-btn" style="font-size: 12px; padding: 6px 10px; color: var(--c-red);" title="Delete">
+                    <i class="bi bi-trash"></i> Delete
+                  </button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
 
-<!-- Instant, client-side filter of the table below (separate from the server-side serial-number search above) -->
-<div class="input-group mb-3" style="max-width: 420px;">
-  <span class="input-group-text bg-white"><i class="bi bi-funnel"></i></span>
-  <input type="text" id="quickFilter" class="form-control" placeholder="Quick filter this table…">
+    <!-- Pagination -->
+    <div style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+      <div id="pageInfo" style="color: var(--c-mute);"></div>
+      <nav aria-label="Customer table pages">
+        <ul class="pagination" id="tablePagination" style="margin: 0;"></ul>
+      </nav>
+    </div>
+
+    <div id="noResultsMsg" class="c-empty" style="display:none; margin-top: 12px;">No rows match your filter.</div>
+  <% } %>
 </div>
 
-<table id="customersTable">
-  <thead>
-    <tr>
-      <th data-sort="text"><i class="bi bi-building"></i> Company Name <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th data-sort="text"><i class="bi bi-geo-alt"></i> Company Address <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th data-sort="text"><i class="bi bi-telephone"></i> Phone <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th data-sort="text"><i class="bi bi-envelope"></i> Email <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th>Action</th>
-    </tr>
-  </thead>
-  <tbody>
-    <% customers.forEach(c => { %>
-      <tr>
-        <td><%= c.name %></td>
-        <td><%= c.company || '—' %></td>
-        <td><%= c.phone || '—' %></td>
-        <td><%= c.email || '—' %></td>
-        <td class="text-nowrap">
-          <a href="/customers/<%= c.id %>/edit" class="btn small secondary" title="Edit"><i class="bi bi-pencil-square"></i> Edit</a>
-          <form method="POST" action="/customers/<%= c.id %>/delete" style="display:inline"
-                onsubmit="return confirm('Delete this customer and all their equipment records?');">
-            <button type="submit" class="btn small danger" title="Delete"><i class="bi bi-trash"></i> Delete</button>
-          </form>
-        </td>
-      </tr>
-    <% }) %>
-  </tbody>
-</table>
-<div id="noResultsMsg" class="empty-state" style="display:none;">No rows match your filter.</div>
-<% } %>
+<%- include('../partials/console-footer') %>
 
 <script>
-  // ---- Instant client-side filter ----
+  // ===== Set today's date =====
+  const todayEl = document.getElementById('todayDate');
+  if (todayEl) {
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    todayEl.textContent = today;
+  }
+
+  // ===== Table filter, sort and pagination =====
+  const PAGE_SIZE = 10;
   const quickFilter = document.getElementById('quickFilter');
-  const customersTable = document.getElementById('customersTable');
+  const dataTable = document.getElementById('customersTable');
   const noResultsMsg = document.getElementById('noResultsMsg');
+  const paginationEl = document.getElementById('tablePagination');
+  const pageInfoEl = document.getElementById('pageInfo');
 
-  if (quickFilter && customersTable) {
-    const rows = Array.from(customersTable.querySelectorAll('tbody tr'));
+  const tbody = dataTable ? dataTable.querySelector('tbody') : null;
+  const allRows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
+  let filteredRows = allRows.slice();
+  let currentPage = 1;
+  let sortCol = null;
+  let sortAsc = true;
 
+  function updateTable() {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const end = start + PAGE_SIZE;
+    const visibleRows = filteredRows.slice(start, end);
+    
+    allRows.forEach(row => row.style.display = 'none');
+    visibleRows.forEach(row => row.style.display = '');
+    
+    noResultsMsg.style.display = filteredRows.length === 0 ? 'block' : 'none';
+    
+    const totalPages = Math.ceil(filteredRows.length / PAGE_SIZE);
+    updatePagination(totalPages);
+    
+    if (pageInfoEl) {
+      pageInfoEl.textContent = filteredRows.length === 0 
+        ? '' 
+        : `Showing ${start + 1}–${Math.min(end, filteredRows.length)} of ${filteredRows.length} customers`;
+    }
+  }
+
+  function updatePagination(totalPages) {
+    paginationEl.innerHTML = '';
+    if (totalPages <= 1) return;
+    
+    for (let i = 1; i <= totalPages; i++) {
+      const li = document.createElement('li');
+      li.className = 'page-item' + (i === currentPage ? ' active' : '');
+      li.innerHTML = `<a class="page-link" href="#" data-page="${i}">${i}</a>`;
+      paginationEl.appendChild(li);
+    }
+    
+    paginationEl.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        currentPage = parseInt(a.dataset.page);
+        updateTable();
+      });
+    });
+  }
+
+  if (quickFilter) {
     quickFilter.addEventListener('input', () => {
-      const q = quickFilter.value.trim().toLowerCase();
-      let visibleCount = 0;
-      rows.forEach((row) => {
-        const matches = row.textContent.toLowerCase().includes(q);
-        row.style.display = matches ? '' : 'none';
-        if (matches) visibleCount++;
+      const term = quickFilter.value.toLowerCase();
+      filteredRows = allRows.filter(row => {
+        const text = row.textContent.toLowerCase();
+        return text.includes(term);
       });
-      customersTable.style.display = visibleCount === 0 ? 'none' : '';
-      noResultsMsg.style.display = visibleCount === 0 ? 'block' : 'none';
+      currentPage = 1;
+      updateTable();
     });
   }
 
-  // ---- Sortable columns ----
-  if (customersTable) {
-    const tbody = customersTable.querySelector('tbody');
-    const headers = customersTable.querySelectorAll('th[data-sort]');
-
-    headers.forEach((th, colIndex) => {
-      th.style.cursor = 'pointer';
-      let ascending = true;
-
-      th.addEventListener('click', () => {
-        const rows = Array.from(tbody.querySelectorAll('tr'));
-
-        rows.sort((a, b) => {
-          const valA = a.children[colIndex].textContent.trim();
-          const valB = b.children[colIndex].textContent.trim();
-          const cmp = valA.localeCompare(valB, undefined, { sensitivity: 'base' });
-          return ascending ? cmp : -cmp;
+  // Sort on header click
+  if (dataTable) {
+    dataTable.querySelectorAll('th').forEach((th, idx) => {
+      if (th.dataset.sort) {
+        th.style.cursor = 'pointer';
+        th.addEventListener('click', () => {
+          const sortType = th.dataset.sort;
+          sortAsc = sortCol === idx ? !sortAsc : true;
+          sortCol = idx;
+          
+          filteredRows.sort((a, b) => {
+            const aVal = a.children[idx].dataset.sortValue || a.children[idx].textContent.trim();
+            const bVal = b.children[idx].dataset.sortValue || b.children[idx].textContent.trim();
+            
+            let cmp = 0;
+            if (sortType === 'number') {
+              cmp = parseFloat(aVal) - parseFloat(bVal);
+            } else {
+              cmp = aVal.localeCompare(bVal);
+            }
+            
+            return sortAsc ? cmp : -cmp;
+          });
+          
+          currentPage = 1;
+          updateTable();
         });
-
-        rows.forEach((row) => tbody.appendChild(row));
-        ascending = !ascending;
-      });
+      }
     });
   }
 
-  // ---- Auto-dismiss the success flash message after a few seconds ----
-  const flashAlert = document.getElementById('flashAlert');
-  if (flashAlert && window.bootstrap) {
-    setTimeout(() => {
-      const alertInstance = bootstrap.Alert.getOrCreateInstance(flashAlert);
-      alertInstance.close();
-    }, 5000);
-  }
+  // Delete confirmation
+  document.querySelectorAll('form[data-confirm-delete]').forEach(form => {
+    form.addEventListener('submit', (e) => {
+      if (!confirm(form.dataset.confirmDelete)) {
+        e.preventDefault();
+      }
+    });
+  });
+
+  // Initial render
+  updateTable();
 </script>
 
-<%- include('../partials/footer') %>
+<style>
+  .pagination {
+    display: flex;
+    gap: 4px;
+    list-style: none;
+    padding: 0;
+  }
+  .page-item .page-link {
+    padding: 4px 8px;
+    border: 1px solid var(--c-line);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--c-text);
+    text-decoration: none;
+  }
+  .page-item .page-link:hover {
+    background: #f0f4f9;
+  }
+  .page-item.active .page-link {
+    background: var(--c-navy);
+    color: #fff;
+    border-color: var(--c-navy);
+  }
+</style>

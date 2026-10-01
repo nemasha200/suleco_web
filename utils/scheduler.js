@@ -141,7 +141,8 @@ async function runNotificationSweep(options = {}) {
   try {
     const rows = db.prepare(`
       SELECT equipment.*, customers.name AS customer_name,
-             customers.phone AS customer_phone, customers.email AS customer_email
+             customers.phone AS customer_phone, customers.phone2 AS customer_phone2,
+             customers.email AS customer_email, customers.email2 AS customer_email2
       FROM equipment
       JOIN customers ON customers.id = equipment.customer_id
     `).all();
@@ -170,11 +171,29 @@ async function runNotificationSweep(options = {}) {
       const { subject, text, html } = buildEmailMessage({ ...row, daysLeft });
       const smsText = buildSmsMessage({ ...row, daysLeft });
 
-      const emailResult = await sendEmail(row.customer_email, subject, text, html);
-      logNotification.run(row.id, row.customer_name, 'email', row.customer_email || '', emailResult.status, emailResult.detail);
+      // A customer may have a second email and/or a second phone on file.
+      // Blank ones are dropped, so a customer with only one of each behaves
+      // exactly as it did before these columns existed.
+      const emailTargets = [row.customer_email, row.customer_email2].filter(Boolean);
+      const phoneTargets = [row.customer_phone, row.customer_phone2].filter(Boolean);
 
-      const smsResult = await sendSMS(row.customer_phone, smsText);
-      logNotification.run(row.id, row.customer_name, 'sms', row.customer_phone || '', smsResult.status, smsResult.detail);
+      // Nodemailer accepts a comma-separated list, so both addresses receive
+      // the SAME message in a single send — one result, one log row.
+      const emailTo = emailTargets.join(', ');
+      const emailResult = await sendEmail(emailTo, subject, text, html);
+      logNotification.run(row.id, row.customer_name, 'email', emailTo, emailResult.status, emailResult.detail);
+
+      // SMS has no equivalent — each number is its own API call, and each gets
+      // its own log row so a failure can be traced to the exact number. The
+      // combined smsResult below is what the counters and the dashboard popup
+      // read: one number succeeding is enough to call the SMS side delivered.
+      let smsResult = { status: 'skipped', detail: 'no phone on file' };
+      for (const number of phoneTargets) {
+        const result = await sendSMS(number, smsText);
+        logNotification.run(row.id, row.customer_name, 'sms', number, result.status, result.detail);
+        if (result.status.startsWith('sent')) smsResult = result;
+        else if (smsResult.status === 'skipped') smsResult = result;
+      }
 
       const emailSucceeded = emailResult.status.startsWith('sent');
       const smsSucceeded = smsResult.status.startsWith('sent');
@@ -189,8 +208,8 @@ async function runNotificationSweep(options = {}) {
         serial: row.serial_number || '',
         due: row.next_calibration_date,
         daysLeft,
-        email: { target: row.customer_email || '', status: emailResult.status },
-        sms: { target: row.customer_phone || '', status: smsResult.status },
+        email: { target: emailTo, status: emailResult.status },
+        sms: { target: phoneTargets.join(', '), status: smsResult.status },
       });
 
       // Only mark this due date as "reminded" if the email actually went out.
@@ -204,7 +223,7 @@ async function runNotificationSweep(options = {}) {
         console.warn(`Email reminder FAILED for ${row.customer_name} (equipment #${row.id}) — will retry on the next sweep. Detail: ${emailResult.detail}`);
       }
 
-      console.log(`Reminded ${row.customer_name} about ${row.brand} ${row.equipment_type} (due ${row.next_calibration_date}) — email: ${emailResult.status}, sms: ${smsResult.status}`);
+      console.log(`Reminded ${row.customer_name} about ${row.brand} ${row.equipment_type} (due ${row.next_calibration_date}) — email: ${emailResult.status} (${emailTargets.length} address(es)), sms: ${smsResult.status} (${phoneTargets.length} number(s))`);
     }
   } catch (err) {
     fatalError = err.message;

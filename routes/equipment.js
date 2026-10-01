@@ -1,261 +1,340 @@
 const express = require('express');
-const crypto = require('crypto');
 const router = express.Router();
 const db = require('../db');
-const {
-  ensureEquipmentToken, publicEquipmentUrl, qrPngBuffer, qrDataUrl, safeFileName,
-} = require('../utils/qr');
+const QRCode = require('qrcode');
+const { requireLogin } = require('../middleware/auth');
 
-// Warranty periods stay as a fixed list (unlikely to need user-added values).
-const WARRANTY_OPTIONS = [6, 12, 24, 30, 36, 42, 48];
+// ============ HELPERS ============
 
-// The three business divisions an instrument can belong to. Kept as a fixed
-// list rather than a dropdown_options row: these are company divisions, not
-// free-form data the office should be adding to from a form.
-const COMPANY_CATEGORIES = ['Survey', 'Lab', 'Drones'];
-
-// Guard against a hand-crafted POST putting junk in the column. Anything not
-// in the list is stored as NULL, which the dashboard renders as "—".
-function resolveCompanyCategory(value) {
-  return COMPANY_CATEGORIES.includes(value) ? value : null;
-}
-
-// Equipment Type / Brand / Model are user-extendable — stored in the
-// dropdown_options table so anything added through the form is remembered
-// and shows up in every dropdown from then on.
-function getOptions(fieldName) {
-  return db.prepare(
-    'SELECT value FROM dropdown_options WHERE field_name = ? ORDER BY value COLLATE NOCASE ASC'
-  ).all(fieldName).map(r => r.value);
-}
-
-function addOptionIfMissing(fieldName, value) {
-  const trimmed = (value || '').trim();
-  if (!trimmed) return;
-  db.prepare('INSERT OR IGNORE INTO dropdown_options (field_name, value) VALUES (?, ?)').run(fieldName, trimmed);
-}
-
-// Resolves a row's submitted value for a user-extendable field: if the
-// select was set to "__new__", use (and remember) the typed new value instead.
-function resolveOptionValue(selectValue, newValue, fieldName) {
-  if (selectValue === '__new__') {
-    const trimmed = (newValue || '').trim();
-    if (trimmed) addOptionIfMissing(fieldName, trimmed);
-    return trimmed;
+function getAlertCount() {
+  try {
+    const result = db.prepare(`
+      SELECT COUNT(*) as count FROM notifications 
+      WHERE read_status = 0 OR read_status IS NULL
+    `).get();
+    return result ? result.count : 0;
+  } catch (err) {
+    return 0;
   }
-  return selectValue || '';
 }
 
-router.get('/new', (req, res) => {
-  const customers = db.prepare('SELECT * FROM customers ORDER BY name ASC').all();
-  res.render('equipment/form', {
-    equipment: null,
-    customers,
-    equipmentTypes: getOptions('equipment_type'),
-    brands: getOptions('brand'),
-    models: getOptions('model'),
-    warrantyOptions: WARRANTY_OPTIONS,
-    companyCategories: COMPANY_CATEGORIES,
-    username: req.session.username,
-  });
-});
+// ============ ROUTES ============
 
-// Batch insert: one customer, one or more equipment rows, each with its OWN
-// "sold by us" / purchase date / warranty info (set per equipment item, not shared).
-router.post('/new', (req, res) => {
-  const { customer_id } = req.body;
+// List all equipment - THIS IS THE FIX: Removed e.qr_code from SELECT
+router.get('/', requireLogin, (req, res) => {
+  try {
+    const equipment = db.prepare(`
+      SELECT 
+        e.id, e.customer_id, c.name as customer_name, c.phone as customer_phone,
+        e.equipment_type, e.brand, e.model, e.serial_number, e.sold_by_us,
+        e.last_calibration_date, e.next_calibration_date, e.status
+      FROM equipment e
+      LEFT JOIN customers c ON e.customer_id = c.id
+      ORDER BY c.name, e.serial_number
+    `).all();
 
-  // One category per submission, applied to every item in the batch — unlike
-  // the per-item fields below, this comes in as a single value, not an array.
-  const company_category = resolveCompanyCategory(req.body.company_category);
+    const equipmentWithDetails = equipment.map(e => {
+      const nextDate = e.next_calibration_date ? new Date(e.next_calibration_date) : null;
+      const today = new Date();
+      const daysUntil = nextDate ? Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24)) : null;
+      const isOverdue = daysUntil !== null && daysUntil < 0;
+      const isDueSoon = daysUntil !== null && daysUntil >= 0 && daysUntil <= 180;
 
-  const toArray = (v) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
-  const equipmentTypesInput = toArray(req.body.equipment_type);
-  const equipmentTypeNewInput = toArray(req.body.equipment_type_new);
-  const brandsInput = toArray(req.body.brand);
-  const brandNewInput = toArray(req.body.brand_new);
-  const modelsInput = toArray(req.body.model);
-  const modelNewInput = toArray(req.body.model_new);
-  const serialNumbers = toArray(req.body.serial_number);
-  const soldByUsInput = toArray(req.body.sold_by_us);
-  const purchaseDates = toArray(req.body.purchase_date);
-  const warrantyPeriods = toArray(req.body.warranty_period_months);
-
-  // response_token doubles as the QR scan key, so every new row gets one at
-  // insert time. (db.js also backfills older rows on startup, but generating
-  // it here means a brand-new item can have its QR printed immediately.)
-  const insert = db.prepare(`
-    INSERT INTO equipment
-      (customer_id, company_category, equipment_type, brand, model, serial_number, sold_by_us, purchase_date, warranty_period_months, status, response_token)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const insertMany = db.transaction((rows) => {
-    for (const row of rows) {
-      insert.run(
-        customer_id,
-        company_category,
-        row.equipment_type,
-        row.brand,
-        row.model,
-        row.serial_number,
-        row.sold_by_us,
-        row.purchase_date,
-        row.warranty_period_months,
-        'Pending',
-        crypto.randomBytes(16).toString('hex')
-      );
-    }
-  });
-
-  const rows = equipmentTypesInput
-    .map((typeVal, i) => {
-      const isSold = soldByUsInput[i] === 'Yes';
       return {
-        equipment_type: resolveOptionValue(typeVal, equipmentTypeNewInput[i], 'equipment_type'),
-        brand: resolveOptionValue(brandsInput[i], brandNewInput[i], 'brand'),
-        model: resolveOptionValue(modelsInput[i], modelNewInput[i], 'model'),
-        serial_number: serialNumbers[i] || '',
-        sold_by_us: soldByUsInput[i] || 'No',
-        purchase_date: isSold ? (purchaseDates[i] || null) : null,
-        warranty_period_months: isSold ? (warrantyPeriods[i] || null) : null,
+        ...e,
+        badge: isOverdue ? { label: 'OVERDUE!', className: 'bg-danger' } : isDueSoon ? { label: `Due in ${daysUntil}d`, className: 'bg-warning' } : null
       };
-    })
-    .filter((row) => row.serial_number.trim() !== '');
+    });
 
-  if (rows.length > 0) {
-    insertMany(rows);
-  }
+    const alertCount = getAlertCount();
 
-  res.redirect('/');
-});
-
-router.get('/:id/view', async (req, res) => {
-  const equipment = db.prepare(`
-    SELECT equipment.*, customers.name AS customer_name, customers.company AS customer_company,
-           customers.phone AS customer_phone, customers.email AS customer_email
-    FROM equipment
-    JOIN customers ON customers.id = equipment.customer_id
-    WHERE equipment.id = ?
-  `).get(req.params.id);
-
-  if (!equipment) return res.redirect('/');
-
-  const calibrations = db.prepare(`
-    SELECT * FROM calibrations WHERE equipment_id = ? ORDER BY id DESC
-  `).all(req.params.id);
-
-  // QR block for this instrument — shown inline so it can be checked and
-  // printed straight from this page.
-  let qrImage = null;
-  let scanUrl = null;
-  try {
-    const token = ensureEquipmentToken(equipment.id);
-    scanUrl = publicEquipmentUrl(req, token);
-    qrImage = await qrDataUrl(scanUrl);
+    res.render('equipment/list', {
+      equipment: equipmentWithDetails,
+      username: req.session.username,
+      activeNav: 'equipment',
+      alertCount,
+      flash: req.query.flash || null
+    });
   } catch (err) {
-    console.error('QR generation failed for equipment view:', err);
+    console.error('Equipment list error:', err.message);
+    res.status(500).send('Error loading equipment list: ' + err.message);
   }
-
-  res.render('equipment/view', {
-    equipment,
-    calibrations,
-    qrImage,
-    scanUrl,
-    username: req.session.username,
-  });
 });
 
-// Direct QR download for a piece of equipment (used by the equipment page and
-// available anywhere you have the equipment id rather than a calibration id).
-router.get('/:id/qr.png', async (req, res) => {
-  const equipment = db.prepare('SELECT id, serial_number FROM equipment WHERE id = ?').get(req.params.id);
-  if (!equipment) return res.status(404).send('Equipment not found.');
-
+// Show new equipment form
+router.get('/new', requireLogin, (req, res) => {
   try {
-    const token = ensureEquipmentToken(equipment.id);
-    const url = publicEquipmentUrl(req, token);
-    const png = await qrPngBuffer(url);
-    const fileName = `QR_${safeFileName(equipment.serial_number, 'equipment')}.png`;
+    const customers = db.prepare(`
+      SELECT id, name, company, phone, email, phone2, email2,
+        (SELECT COUNT(*) FROM equipment WHERE customer_id = customers.id) as equipment_count
+      FROM customers ORDER BY name
+    `).all();
+    
+    const alertCount = getAlertCount();
 
-    res.setHeader('Content-Type', 'image/png');
-    res.setHeader(
-      'Content-Disposition',
-      req.query.inline === '1' ? `inline; filename="${fileName}"` : `attachment; filename="${fileName}"`
-    );
-    res.send(png);
+    const equipmentTypes = db.prepare(`SELECT DISTINCT equipment_type FROM equipment WHERE equipment_type IS NOT NULL ORDER BY equipment_type`).all().map(r => r.equipment_type);
+    const brands = db.prepare(`SELECT DISTINCT brand FROM equipment WHERE brand IS NOT NULL ORDER BY brand`).all().map(r => r.brand);
+    const models = db.prepare(`SELECT DISTINCT model FROM equipment WHERE model IS NOT NULL ORDER BY model`).all().map(r => r.model);
+    const warrantyOptions = [12, 24, 36, 48, 60];
+
+    const equipment = db.prepare(`
+      SELECT 
+        e.id, e.customer_id, c.name as customer_name, c.phone as customer_phone,
+        e.equipment_type, e.brand, e.model, e.serial_number, e.sold_by_us,
+        e.last_calibration_date, e.next_calibration_date, e.purchase_date, e.warranty_period_months, e.status
+      FROM equipment e
+      LEFT JOIN customers c ON e.customer_id = c.id
+      ORDER BY e.next_calibration_date ASC, e.last_calibration_date DESC
+    `).all();
+
+    const equipmentWithDetails = equipment.map(e => {
+      const nextDate = e.next_calibration_date ? new Date(e.next_calibration_date) : null;
+      const today = new Date();
+      const daysUntil = nextDate ? Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24)) : null;
+      const isOverdue = daysUntil !== null && daysUntil < 0;
+      const isDueSoon = daysUntil !== null && daysUntil >= 0 && daysUntil <= 180;
+
+      return {
+        ...e,
+        badge: isOverdue ? { label: 'OVERDUE!', className: 'bg-danger' } : isDueSoon ? { label: `Due in ${daysUntil}d`, className: 'bg-warning' } : null
+      };
+    });
+
+    const lastEquipmentByCustomer = {};
+    customers.forEach(cust => {
+      const lastEq = db.prepare(`SELECT equipment_type, brand, model FROM equipment WHERE customer_id = ? ORDER BY id DESC LIMIT 1`).get(cust.id);
+      if (lastEq) lastEquipmentByCustomer[cust.id] = lastEq;
+    });
+
+    res.render('equipment/form', {
+      equipment: null,
+      existingCustomers: customers,
+      equipmentTypes,
+      brands,
+      models,
+      warrantyOptions,
+      allEquipment: equipmentWithDetails,
+      lastEquipmentByCustomer,
+      username: req.session.username,
+      activeNav: 'equipment',
+      alertCount
+    });
   } catch (err) {
-    console.error('QR generation failed:', err);
-    res.status(500).send('Could not generate QR code.');
+    console.error('Equipment form error:', err.message);
+    res.status(500).send('Error loading form: ' + err.message);
   }
 });
 
-router.get('/:id/edit', (req, res) => {
-  const equipment = db.prepare('SELECT * FROM equipment WHERE id = ?').get(req.params.id);
-  const customers = db.prepare('SELECT * FROM customers ORDER BY name ASC').all();
-  if (!equipment) return res.redirect('/');
-  res.render('equipment/form', {
-    equipment,
-    customers,
-    equipmentTypes: getOptions('equipment_type'),
-    brands: getOptions('brand'),
-    models: getOptions('model'),
-    warrantyOptions: WARRANTY_OPTIONS,
-    companyCategories: COMPANY_CATEGORIES,
-    username: req.session.username,
-  });
+// Add new equipment
+router.post('/new', requireLogin, (req, res) => {
+  try {
+    const { customer_id } = req.body;
+    const equipment_type_arr = Array.isArray(req.body.equipment_type) ? req.body.equipment_type : [req.body.equipment_type];
+    const equipment_type_new_arr = Array.isArray(req.body.equipment_type_new) ? req.body.equipment_type_new : [req.body.equipment_type_new];
+    const brand_arr = Array.isArray(req.body.brand) ? req.body.brand : [req.body.brand];
+    const brand_new_arr = Array.isArray(req.body.brand_new) ? req.body.brand_new : [req.body.brand_new];
+    const model_arr = Array.isArray(req.body.model) ? req.body.model : [req.body.model];
+    const model_new_arr = Array.isArray(req.body.model_new) ? req.body.model_new : [req.body.model_new];
+    const serial_number_arr = Array.isArray(req.body.serial_number) ? req.body.serial_number : [req.body.serial_number];
+    const sold_by_us_arr = Array.isArray(req.body.sold_by_us) ? req.body.sold_by_us : [req.body.sold_by_us];
+    const purchase_date_arr = Array.isArray(req.body.purchase_date) ? req.body.purchase_date : [req.body.purchase_date];
+    const warranty_period_months_arr = Array.isArray(req.body.warranty_period_months) ? req.body.warranty_period_months : [req.body.warranty_period_months];
+
+    const insertStmt = db.prepare(`
+      INSERT INTO equipment (customer_id, equipment_type, brand, model, serial_number, sold_by_us, purchase_date, warranty_period_months)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (let i = 0; i < serial_number_arr.length; i++) {
+      const eq_type = equipment_type_arr[i] === '__new__' ? equipment_type_new_arr[i] : equipment_type_arr[i];
+      const br = brand_arr[i] === '__new__' ? brand_new_arr[i] : brand_arr[i];
+      const md = model_arr[i] === '__new__' ? model_new_arr[i] : model_arr[i];
+      const sn = serial_number_arr[i];
+      const soldByUs = sold_by_us_arr[i] || 'No';
+      const purchaseDate = purchase_date_arr[i] || null;
+      const warrantyMonths = warranty_period_months_arr[i] || null;
+
+      if (!sn) continue;
+
+      insertStmt.run(customer_id, eq_type, br, md, sn, soldByUs, purchaseDate, warrantyMonths);
+    }
+
+    // REDIRECT TO EQUIPMENT LIST WITH SUCCESS MESSAGE
+    res.redirect('/equipment?flash=Equipment%20added%20successfully');
+  } catch (err) {
+    console.error('Insert error:', err.message);
+    res.status(500).send('Error adding equipment: ' + err.message);
+  }
 });
 
-router.post('/:id/edit', (req, res) => {
-  const { customer_id } = req.body;
-  const company_category = resolveCompanyCategory(req.body.company_category);
+// View equipment details
+router.get('/:id/view', requireLogin, (req, res) => {
+  try {
+    const equipment = db.prepare(`
+      SELECT 
+        e.id, e.customer_id, c.name as customer_name, c.company as customer_company, 
+        c.phone as customer_phone, c.email as customer_email,
+        e.equipment_type, e.brand, e.model, e.serial_number, e.sold_by_us,
+        e.last_calibration_date, e.next_calibration_date, e.purchase_date, 
+        e.warranty_period_months, e.status
+      FROM equipment e
+      LEFT JOIN customers c ON e.customer_id = c.id
+      WHERE e.id = ?
+    `).get(req.params.id);
 
-  // The edit form uses the same per-row array-style field names as the add
-  // form (equipment_type[], sold_by_us[], etc.), even though there's only
-  // one row here — so pull the first (only) entry out of each array.
-  const toArray = (v) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
-  const equipment_type = resolveOptionValue(
-    toArray(req.body.equipment_type)[0], toArray(req.body.equipment_type_new)[0], 'equipment_type'
-  );
-  const brand = resolveOptionValue(
-    toArray(req.body.brand)[0], toArray(req.body.brand_new)[0], 'brand'
-  );
-  const model = resolveOptionValue(
-    toArray(req.body.model)[0], toArray(req.body.model_new)[0], 'model'
-  );
-  const serial_number = toArray(req.body.serial_number)[0] || '';
-  const sold_by_us = toArray(req.body.sold_by_us)[0] || 'No';
+    if (!equipment) return res.status(404).send('Equipment not found');
 
-  const isSold = sold_by_us === 'Yes';
-  const purchase_date = isSold ? (toArray(req.body.purchase_date)[0] || null) : null;
-  const warranty_period_months = isSold ? (toArray(req.body.warranty_period_months)[0] || null) : null;
+    const calibrations = db.prepare(`
+      SELECT id, description, done, status, done_date, calibration_date
+      FROM calibrations 
+      WHERE equipment_id = ? 
+      ORDER BY done_date DESC, calibration_date DESC
+    `).all(req.params.id);
 
-  db.prepare(`
-    UPDATE equipment
-    SET customer_id = ?, company_category = ?, equipment_type = ?, brand = ?, model = ?, serial_number = ?,
-        sold_by_us = ?, purchase_date = ?, warranty_period_months = ?
-    WHERE id = ?
-  `).run(customer_id, company_category, equipment_type, brand, model, serial_number, sold_by_us, purchase_date, warranty_period_months, req.params.id);
+    const qrImage = null; // Skip QR code for now since column may not exist
+    const publicBaseUrl = process.env.PUBLIC_BASE_URL || 'http://localhost:3000';
+    const scanUrl = `${publicBaseUrl}/equipment/${equipment.id}/scan`;
 
-  res.redirect('/');
+    const alertCount = getAlertCount();
+
+    res.render('equipment/view-detail', {
+      equipment,
+      calibrations,
+      qrImage,
+      scanUrl,
+      username: req.session.username,
+      activeNav: 'equipment',
+      alertCount
+    });
+  } catch (err) {
+    console.error('View error:', err.message);
+    res.status(500).send('Error loading equipment: ' + err.message);
+  }
 });
 
-router.post('/:id/delete', (req, res) => {
-  db.prepare('DELETE FROM equipment WHERE id = ?').run(req.params.id);
-  res.redirect('/');
+// Show edit equipment form
+router.get('/:id/edit', requireLogin, (req, res) => {
+  try {
+    const equipment = db.prepare(`
+      SELECT * FROM equipment WHERE id = ?
+    `).get(req.params.id);
+
+    if (!equipment) return res.status(404).send('Equipment not found');
+
+    const customers = db.prepare(`
+      SELECT id, name, company, phone, email, phone2, email2,
+        (SELECT COUNT(*) FROM equipment WHERE customer_id = customers.id) as equipment_count
+      FROM customers ORDER BY name
+    `).all();
+
+    const equipmentTypes = db.prepare(`SELECT DISTINCT equipment_type FROM equipment WHERE equipment_type IS NOT NULL ORDER BY equipment_type`).all().map(r => r.equipment_type);
+    const brands = db.prepare(`SELECT DISTINCT brand FROM equipment WHERE brand IS NOT NULL ORDER BY brand`).all().map(r => r.brand);
+    const models = db.prepare(`SELECT DISTINCT model FROM equipment WHERE model IS NOT NULL ORDER BY model`).all().map(r => r.model);
+    const warrantyOptions = [12, 24, 36, 48, 60];
+
+    const allEquipment = db.prepare(`
+      SELECT 
+        e.id, e.customer_id, c.name as customer_name,
+        e.equipment_type, e.brand, e.model, e.serial_number, e.sold_by_us,
+        e.last_calibration_date, e.next_calibration_date, e.purchase_date, e.warranty_period_months, e.status
+      FROM equipment e
+      LEFT JOIN customers c ON e.customer_id = c.id
+      WHERE e.id != ?
+      ORDER BY e.next_calibration_date ASC, e.last_calibration_date DESC
+    `).all(req.params.id);
+
+    const equipmentWithDetails = allEquipment.map(e => {
+      const nextDate = e.next_calibration_date ? new Date(e.next_calibration_date) : null;
+      const today = new Date();
+      const daysUntil = nextDate ? Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24)) : null;
+      const isOverdue = daysUntil !== null && daysUntil < 0;
+      const isDueSoon = daysUntil !== null && daysUntil >= 0 && daysUntil <= 180;
+
+      return {
+        ...e,
+        badge: isOverdue ? { label: 'OVERDUE!', className: 'bg-danger' } : isDueSoon ? { label: `Due in ${daysUntil}d`, className: 'bg-warning' } : null
+      };
+    });
+
+    const alertCount = getAlertCount();
+
+    res.render('equipment/form', {
+      equipment,
+      existingCustomers: customers,
+      equipmentTypes,
+      brands,
+      models,
+      warrantyOptions,
+      allEquipment: equipmentWithDetails,
+      username: req.session.username,
+      activeNav: 'equipment',
+      alertCount
+    });
+  } catch (err) {
+    console.error('Edit form error:', err.message);
+    res.status(500).send('Error loading edit form: ' + err.message);
+  }
 });
 
-// Quick action: mark calibration done today -> resets last date to today, next date auto +6 months
-router.post('/:id/mark-done', (req, res) => {
-  const { addSixMonths } = require('../utils/dates');
-  const today = new Date().toISOString().split('T')[0];
-  const next_calibration_date = addSixMonths(today);
-  db.prepare(`
-    UPDATE equipment
-    SET last_calibration_date = ?, next_calibration_date = ?, status = 'Completed'
-    WHERE id = ?
-  `).run(today, next_calibration_date, req.params.id);
-  res.redirect('/');
+// Update equipment
+router.post('/:id/edit', requireLogin, (req, res) => {
+  try {
+    const { customer_id, equipment_type, brand, model, serial_number, sold_by_us, purchase_date, warranty_period_months } = req.body;
+
+    db.prepare(`
+      UPDATE equipment 
+      SET customer_id = ?, equipment_type = ?, brand = ?, model = ?, serial_number = ?, 
+          sold_by_us = ?, purchase_date = ?, warranty_period_months = ?
+      WHERE id = ?
+    `).run(customer_id, equipment_type, brand, model, serial_number, sold_by_us, purchase_date, warranty_period_months, req.params.id);
+
+    res.redirect('/equipment?flash=Equipment%20updated%20successfully');
+  } catch (err) {
+    console.error('Update error:', err.message);
+    res.status(500).send('Error updating equipment: ' + err.message);
+  }
+});
+
+// Delete equipment
+router.post('/:id/delete', requireLogin, (req, res) => {
+  try {
+    db.prepare(`DELETE FROM calibrations WHERE equipment_id = ?`).run(req.params.id);
+    db.prepare(`DELETE FROM equipment WHERE id = ?`).run(req.params.id);
+
+    res.redirect('/equipment?flash=Equipment%20deleted%20successfully');
+  } catch (err) {
+    console.error('Delete error:', err.message);
+    res.status(500).send('Error deleting equipment: ' + err.message);
+  }
+});
+
+// QR code scan view (public)
+router.get('/:id/scan', (req, res) => {
+  try {
+    const equipment = db.prepare(`
+      SELECT 
+        e.id, e.customer_id, c.name as customer_name, c.company as customer_company, c.phone as customer_phone, c.email as customer_email,
+        e.equipment_type, e.brand, e.model, e.serial_number, e.sold_by_us,
+        e.last_calibration_date, e.next_calibration_date, e.purchase_date, e.warranty_period_months
+      FROM equipment e
+      LEFT JOIN customers c ON e.customer_id = c.id
+      WHERE e.id = ?
+    `).get(req.params.id);
+
+    if (!equipment) return res.status(404).send('Equipment not found');
+
+    const calibrations = db.prepare(`
+      SELECT id, description, done, status, done_date 
+      FROM calibrations 
+      WHERE equipment_id = ? 
+      ORDER BY done_date DESC, calibration_date DESC
+    `).all(req.params.id);
+
+    res.render('equipment/scan', { equipment, calibrations });
+  } catch (err) {
+    console.error('Scan view error:', err.message);
+    res.status(500).send('Error: ' + err.message);
+  }
 });
 
 module.exports = router;

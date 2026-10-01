@@ -201,7 +201,7 @@ tbody tr:hover { background: #FAFBFD; }
   height: 40px; width: auto; max-width: 200px; object-fit: contain;
 }
 .topbar-v2 .brand-text { display: flex; align-items: center; gap: 2px; line-height: 1.15; }
-.topbar-v2 .brand-text .brand-title { font-weight: 700; font-size: 16px; position: relative; top: -8px; }
+.topbar-v2 .brand-text .brand-title { font-weight: 700; font-size: 22px; position: relative; top: -8px; }
 .topbar-v2 .brand-text .brand-title span { color: var(--gold); }
 .topbar-v2 .brand-text .brand-sub { font-size: 10px; letter-spacing: .08em; color: #9FB0C8; text-transform: uppercase; }
 
@@ -802,3 +802,61 @@ body.equipment-page {
        bodyClass: 'has-page-bg page-bg--customer'                            */
 
 body.page-bg--customer { --page-bg-image: url('/images/bg-1.jpg'); }
+/* ---------------------------------------------------------------------------
+   Customer info panel on the Add/Edit Equipment page.
+   A customer can have two phone numbers and two email addresses, so each value
+   is rendered on its own line instead of being squashed together with a slash.
+--------------------------------------------------------------------------- */
+.cust-info-value {
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cust-info-line {
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.cust-info-line a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.cust-info-line a:hover {
+  color: var(--gold);
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------------------
+   "Already registered" note on the Add Customer form. Deliberately small and
+   quiet — it is a heads-up, not a validation error, so it should not look like
+   the form has failed. Shown by the script with display:flex.
+--------------------------------------------------------------------------- */
+.dup-note {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  margin: -6px 0 14px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: #8A6100;
+  background: #FFF8E6;
+  border: 1px solid #F1E2B6;
+  border-radius: 6px;
+}
+
+.dup-note i {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.dup-note a {
+  color: #8A6100;
+  font-weight: 600;
+  text-decoration: underline;
+}

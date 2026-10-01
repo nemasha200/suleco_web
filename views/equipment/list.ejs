@@ -1,0 +1,442 @@
+<%- include('../partials/console-header', { 
+  title: 'Equipment', 
+  activeNav: 'equipment', 
+  alertCount: typeof alertCount !== 'undefined' ? alertCount : 0,
+  username: typeof username !== 'undefined' ? username : 'admin'
+}) %>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+  <h1 style="margin: 0;"><i class="bi bi-list-ul" style="color:var(--gold);"></i> Equipment</h1>
+  <a href="/equipment/new" class="btn" style="background: #0066cc; color: white; font-weight: 600; padding: 10px 18px; border-radius: 6px; border: none; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+    <i class="bi bi-plus-lg"></i> Add Equipment
+  </a>
+</div>
+
+<p class="subtitle" style="margin-bottom: 20px;">Everything already on file, soonest calibration first.</p>
+
+<% if (typeof flash !== 'undefined' && flash) { %>
+  <div id="flashAlert" class="alert alert-success alert-dismissible fade show d-flex align-items-center gap-2" role="alert" style="max-width: 100%; margin-bottom: 20px;">
+    <i class="bi bi-check-circle-fill"></i>
+    <div><%= flash %></div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+<% } %>
+
+<% if (typeof equipment === 'undefined' || !equipment || equipment.length === 0) { %>
+  <div class="empty-state" style="padding: 40px 20px; text-align: center; color: #999; background: #fafafa; border-radius: 6px; border: 1px dashed #ddd;">
+    No equipment registered yet. <a href="/customers/new" style="color: #0066cc; font-weight: 600; text-decoration: none;">Add a customer</a> first, then click "Add Equipment" above.
+  </div>
+<% } else { %>
+
+  <!-- Quick filter -->
+  <div class="input-group mb-3" style="max-width: 420px;">
+    <span class="input-group-text bg-white"><i class="bi bi-funnel"></i></span>
+    <input type="text" id="quickFilter" class="form-control" placeholder="Quick filter this table…">
+  </div>
+
+  <!-- Equipment table -->
+  <table id="equipmentTable">
+    <thead>
+      <tr>
+        <th data-sort="text">Customer <i class="bi bi-arrow-down-up sort-icon"></i></th>
+        <th data-sort="text">Equipment Type <i class="bi bi-arrow-down-up sort-icon"></i></th>
+        <th data-sort="text">Brand <i class="bi bi-arrow-down-up sort-icon"></i></th>
+        <th data-sort="text">Model <i class="bi bi-arrow-down-up sort-icon"></i></th>
+        <th data-sort="text">Serial No. <i class="bi bi-arrow-down-up sort-icon"></i></th>
+        <th data-sort="date">Last Calibration <i class="bi bi-arrow-down-up sort-icon"></i></th>
+        <th data-sort="date">Next Calibration <i class="bi bi-arrow-down-up sort-icon"></i></th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% equipment.forEach(e => { %>
+        <tr>
+          <td>
+            <strong><%= e.customer_name || '—' %></strong>
+            <br><span class="hint"><%= e.customer_phone || '' %></span>
+          </td>
+          <td><%= e.equipment_type || '—' %></td>
+          <td><%= e.brand || '—' %></td>
+          <td><%= e.model || '—' %></td>
+          <td><strong><%= e.serial_number || '—' %></strong></td>
+          <td data-sort-value="<%= e.last_calibration_date || '' %>">
+            <%= e.last_calibration_date || '—' %>
+          </td>
+          <td data-sort-value="<%= e.next_calibration_date || '' %>">
+            <%= e.next_calibration_date || '—' %>
+            <% if (e.badge && e.badge.label) { %>
+              <span class="badge <%= e.badge.className %>"><%= e.badge.label %></span>
+            <% } %>
+          </td>
+          <td class="text-nowrap" style="display: flex; gap: 6px;">
+            <a href="/equipment/<%= e.id %>/view" class="btn-icon" title="View" style="color: #0066cc; font-size: 16px; cursor: pointer;"><i class="bi bi-eye"></i></a>
+            <a href="/equipment/<%= e.id %>/edit" class="btn-icon" title="Edit" style="color: #FFC107; font-size: 16px; cursor: pointer;"><i class="bi bi-pencil"></i></a>
+            <form method="POST" action="/equipment/<%= e.id %>/delete" style="display:inline"
+                  data-confirm-delete="This equipment and all of its calibration records will be deleted.">
+              <button type="submit" class="btn-icon" title="Delete" style="color: #dc3545; font-size: 16px; cursor: pointer; background: none; border: none; padding: 0;"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <div id="noResultsMsg" class="empty-state" style="display:none; padding: 40px 20px; text-align: center; color: #999; background: #fafafa; border-radius: 6px; border: 1px dashed #ddd;">
+    No rows match your filter.
+  </div>
+
+  <!-- Pagination -->
+  <nav aria-label="Equipment table pages" class="mt-3">
+    <ul class="pagination justify-content-start mb-2" id="tablePagination"></ul>
+  </nav>
+  <div id="pageInfo" class="hint mb-4"></div>
+
+<% } %>
+
+<!-- ===== STYLES ===== -->
+<style>
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
+
+  .btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+
+  .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 3px;
+    transition: all 0.2s;
+  }
+
+  .btn-icon:hover {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+
+  .subtitle {
+    color: #666;
+    margin-bottom: 20px;
+    font-size: 14px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  table thead {
+    background-color: #0B2545;
+    color: white;
+  }
+
+  table th {
+    padding: 12px 14px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    user-select: none;
+  }
+
+  table th[data-sort] {
+    cursor: pointer;
+  }
+
+  table th[data-sort]:hover {
+    background-color: #153860;
+  }
+
+  .sort-icon {
+    font-size: 10px;
+    opacity: 0.6;
+  }
+
+  table th[data-sort]:hover .sort-icon {
+    opacity: 1;
+  }
+
+  table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 13px;
+  }
+
+  table tbody tr:hover {
+    background-color: #f9f9f9;
+  }
+
+  table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .hint {
+    font-size: 12px;
+    color: #999;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+  }
+
+  .badge.bg-warning {
+    background-color: #ffc107;
+    color: #333;
+  }
+
+  .badge.bg-danger {
+    background-color: #dc3545;
+    color: white;
+  }
+
+  .pagination {
+    gap: 4px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .pagination .page-item {
+    display: inline-block;
+  }
+
+  .pagination .page-link {
+    padding: 6px 10px;
+    font-size: 12px;
+    color: #0066cc;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    text-decoration: none;
+    cursor: pointer;
+    background: white;
+    display: block;
+  }
+
+  .pagination .page-link:hover:not(.disabled) {
+    background-color: #f0f0f0;
+  }
+
+  .pagination .page-item.active .page-link {
+    background-color: #1AA9BC;
+    border-color: #1AA9BC;
+    color: white;
+  }
+
+  .pagination .page-item.disabled .page-link {
+    color: #999;
+    cursor: not-allowed;
+  }
+
+  .empty-state {
+    padding: 40px 20px;
+    text-align: center;
+    color: #999;
+    background: #fafafa;
+    border-radius: 6px;
+    border: 1px dashed #ddd;
+  }
+
+  .empty-state a {
+    color: #0066cc;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .empty-state a:hover {
+    text-decoration: underline;
+  }
+</style>
+
+<!-- ===== SCRIPTS ===== -->
+
+<script>
+  const PAGE_SIZE = 10;
+
+  const quickFilter = document.getElementById('quickFilter');
+  const dataTable = document.getElementById('equipmentTable');
+  const noResultsMsg = document.getElementById('noResultsMsg');
+  const paginationEl = document.getElementById('tablePagination');
+  const pageInfoEl = document.getElementById('pageInfo');
+
+  if (dataTable) {
+    const tbody = dataTable.querySelector('tbody');
+    const allRows = Array.from(tbody.querySelectorAll('tr'));
+    let filteredRows = allRows.slice();
+    let currentPage = 1;
+
+    function applyFilter() {
+      const q = quickFilter ? quickFilter.value.trim().toLowerCase() : '';
+      filteredRows = q
+        ? allRows.filter((row) => row.textContent.toLowerCase().includes(q))
+        : allRows.slice();
+    }
+
+    function render() {
+      const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+      if (currentPage > totalPages) currentPage = totalPages;
+
+      allRows.forEach((row) => { row.style.display = 'none'; });
+
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const pageRows = filteredRows.slice(start, start + PAGE_SIZE);
+      pageRows.forEach((row) => { row.style.display = ''; });
+
+      const isEmpty = filteredRows.length === 0;
+      dataTable.style.display = isEmpty ? 'none' : '';
+      if (noResultsMsg) noResultsMsg.style.display = isEmpty ? 'block' : 'none';
+
+      if (pageInfoEl) {
+        pageInfoEl.textContent = isEmpty
+          ? ''
+          : `Showing ${start + 1}–${start + pageRows.length} of ${filteredRows.length}`;
+      }
+
+      renderPagination(totalPages);
+    }
+
+    function renderPagination(totalPages) {
+      if (!paginationEl) return;
+      paginationEl.innerHTML = '';
+
+      const addItem = (label, page, opts = {}) => {
+        const li = document.createElement('li');
+        li.className = 'page-item'
+          + (opts.disabled ? ' disabled' : '')
+          + (opts.active ? ' active' : '');
+
+        const span = document.createElement('span');
+        span.className = 'page-link';
+
+        if (opts.disabled || opts.active) {
+          span.textContent = label;
+          if (opts.active) {
+            const sr = document.createElement('span');
+            sr.className = 'visually-hidden';
+            sr.textContent = '(current)';
+            span.appendChild(sr);
+          }
+          li.appendChild(span);
+        } else {
+          const a = document.createElement('a');
+          a.className = 'page-link';
+          a.href = '#';
+          a.textContent = label;
+          a.addEventListener('click', (e) => {
+            e.preventDefault();
+            currentPage = page;
+            render();
+            dataTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+          li.appendChild(a);
+        }
+
+        paginationEl.appendChild(li);
+      };
+
+      addItem('Previous', currentPage - 1, { disabled: currentPage === 1 });
+
+      let lastPrinted = 0;
+      for (let p = 1; p <= totalPages; p++) {
+        const nearCurrent = Math.abs(p - currentPage) <= 2;
+        if (p !== 1 && p !== totalPages && !nearCurrent) continue;
+        if (lastPrinted && p - lastPrinted > 1) addItem('…', 0, { disabled: true });
+        addItem(String(p), p, { active: p === currentPage });
+        lastPrinted = p;
+      }
+
+      addItem('Next', currentPage + 1, { disabled: currentPage === totalPages });
+    }
+
+    if (quickFilter) {
+      quickFilter.addEventListener('input', () => {
+        applyFilter();
+        currentPage = 1;
+        render();
+      });
+    }
+
+    // Sortable columns
+    dataTable.querySelectorAll('th[data-sort]').forEach((th, colIndex) => {
+      th.style.cursor = 'pointer';
+      let ascending = true;
+
+      th.addEventListener('click', () => {
+        const type = th.dataset.sort;
+
+        allRows.sort((a, b) => {
+          const cellA = a.children[colIndex];
+          const cellB = b.children[colIndex];
+          const valA = (cellA.dataset.sortValue !== undefined ? cellA.dataset.sortValue : cellA.textContent).trim();
+          const valB = (cellB.dataset.sortValue !== undefined ? cellB.dataset.sortValue : cellB.textContent).trim();
+
+          let cmp;
+          if (type === 'date') {
+            if (!valA && !valB) cmp = 0;
+            else if (!valA) cmp = 1;
+            else if (!valB) cmp = -1;
+            else cmp = new Date(valA) - new Date(valB);
+          } else if (type === 'number') {
+            cmp = (Number(valA) || 0) - (Number(valB) || 0);
+          } else {
+            cmp = valA.localeCompare(valB, undefined, { sensitivity: 'base' });
+          }
+          return ascending ? cmp : -cmp;
+        });
+
+        allRows.forEach((row) => tbody.appendChild(row));
+        applyFilter();
+        currentPage = 1;
+        render();
+        ascending = !ascending;
+      });
+    });
+
+    render();
+  }
+
+  // Auto-dismiss flash message
+  window.addEventListener('load', () => {
+    if (!window.bootstrap) return;
+    const flashAlert = document.getElementById('flashAlert');
+    if (flashAlert) {
+      setTimeout(() => bootstrap.Alert.getOrCreateInstance(flashAlert).close(), 5000);
+    }
+  });
+
+  // Confirm delete
+  document.querySelectorAll('form[data-confirm-delete]').forEach(form => {
+    form.addEventListener('submit', (e) => {
+      if (!confirm(form.dataset.confirmDelete)) {
+        e.preventDefault();
+      }
+    });
+  });
+</script>
+
+<%- include('../partials/console-footer') %>

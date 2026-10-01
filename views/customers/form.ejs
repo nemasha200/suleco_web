@@ -1,36 +1,323 @@
-<%- include('../partials/header', { title: (customer ? 'Edit' : 'Add') + ' Customer', username, bodyClass: 'customers-page' }) %>
-<h1><%= customer ? 'Edit Customer' : 'Add Customer' %></h1>
-<p class="subtitle">Customer / company details.</p>
+<%- include('../partials/console-header', { 
+  title: (customer ? 'Edit' : 'Add') + ' Customer',
+  activeNav: 'customers',
+  alertCount: typeof alertCount !== 'undefined' ? alertCount : 0,
+  username: typeof username !== 'undefined' ? username : 'admin'
+}) %>
 
-<div class="card">
-  <!-- Negative margins pull the strip out to the card's edges, cancelling the
-       card's own 24px padding so the blue runs corner to corner. -->
-  <div class="d-flex align-items-center gap-2 mb-4"
-       style="background: var(--navy); color: #fff; margin: -24px -24px 0; padding: 16px 24px; border-radius: 10px 10px 0 0;">
-    <i class="bi bi-person-fill fs-4" style="color: var(--gold);"></i>
-    <span style="font-weight:700;"><%= customer ? 'Edit Customer' : 'New Customer' %></span>
+<!-- ===== PAGE HEADER ===== -->
+<div class="c-deptbar">
+  <div>
+    <div class="c-deptbar__name"><%= customer ? 'Edit Customer' : 'Add Customer' %></div>
+    <div class="c-deptbar__org">Customer & company details</div>
+  </div>
+</div>
+
+<!-- ===== MAIN FORM CARD ===== -->
+<div class="c-card" style="max-width: 600px;">
+  <!-- Card header -->
+  <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--c-line);">
+    <div class="c-card__icon blue">
+      <i class="bi bi-person-fill"></i>
+    </div>
+    <div>
+      <div class="c-card__title"><%= customer ? 'Edit Customer' : 'New Customer' %></div>
+      <div class="c-card__sub">Update customer information</div>
+    </div>
   </div>
 
   <form method="POST" action="<%= customer ? '/customers/' + customer.id + '/edit' : '/customers/new' %>">
-    <div class="form-group">
-      <label>Company Name</label>
-      <input type="text" name="name" required value="<%= customer ? customer.name : '' %>">
+    
+    <!-- ===== Company Name (with autocomplete) ===== -->
+    <div style="margin-bottom: 18px;">
+      <label style="display: block; font-size: 13px; font-weight: 600; color: var(--c-text); margin-bottom: 6px;">
+        Company Name *
+      </label>
+      <div style="position: relative;">
+        <input 
+          type="text" 
+          name="name" 
+          id="companyNameInput" 
+          autocomplete="off" 
+          required
+          value="<%= customer ? customer.name : (typeof prefillName !== 'undefined' ? prefillName : '') %>"
+          style="
+            width: 100%;
+            border: 1px solid var(--c-line);
+            border-radius: 9px;
+            padding: 9px 12px;
+            font-size: 13px;
+            color: var(--c-text);
+            font-family: inherit;
+          "
+          placeholder="e.g. Acme Corporation"
+        >
+        <div 
+          id="companyResults" 
+          class="combo-results"
+          style="
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #fff;
+            border: 1px solid var(--c-line);
+            border-top: 0;
+            border-radius: 0 0 9px 9px;
+            max-height: 240px;
+            overflow-y: auto;
+            z-index: 10;
+            display: none;
+          "
+        ></div>
+      </div>
+      <div style="font-size: 12px; color: var(--c-mute); margin-top: 5px;">
+        Already a customer? Start typing and pick from the list.
+      </div>
     </div>
-    <div class="form-group">
-      <label>Company Address</label>
-      <input type="text" name="company" value="<%= customer ? (customer.company || '') : '' %>">
+
+    <!-- ===== Duplicate Warning ===== -->
+    <div id="duplicateWarning" style="
+      display: none;
+      align-items: center;
+      gap: 12px;
+      background: #FDF1DC;
+      border: 1px solid var(--c-amber);
+      border-radius: 9px;
+      padding: 12px 14px;
+      margin-bottom: 18px;
+      font-size: 13px;
+      color: #6B4C00;
+    ">
+      <i class="bi bi-exclamation-circle-fill" style="color: var(--c-amber); font-size: 16px; flex-shrink: 0;"></i>
+      <div>
+        <strong id="duplicateName"></strong> is already registered — 
+        <a id="duplicateEditLink" href="#" style="color: var(--c-blue); font-weight: 600; text-decoration: none;">edit the existing customer</a>.
+      </div>
     </div>
-    <div class="form-group">
-      <label>Phone</label>
-      <input type="text" name="phone" value="<%= customer ? (customer.phone || '') : '' %>">
+
+    <!-- ===== Company Address ===== -->
+    <div style="margin-bottom: 18px;">
+      <label style="display: block; font-size: 13px; font-weight: 600; color: var(--c-text); margin-bottom: 6px;">
+        Company Address
+      </label>
+      <input 
+        type="text" 
+        name="company" 
+        id="companyAddressInput" 
+        value="<%= customer ? (customer.company || '') : '' %>"
+        style="
+          width: 100%;
+          border: 1px solid var(--c-line);
+          border-radius: 9px;
+          padding: 9px 12px;
+          font-size: 13px;
+          color: var(--c-text);
+          font-family: inherit;
+        "
+        placeholder="Street address"
+      >
     </div>
-    <div class="form-group">
-      <label>Email</label>
-      <input type="email" name="email" value="<%= customer ? (customer.email || '') : '' %>">
+
+    <!-- ===== Phone & Phone 2 (side by side) ===== -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px;">
+      <div>
+        <label style="display: block; font-size: 13px; font-weight: 600; color: var(--c-text); margin-bottom: 6px;">
+          Phone
+        </label>
+        <input 
+          type="text" 
+          name="phone" 
+          id="phoneInput" 
+          value="<%= customer ? (customer.phone || '') : '' %>"
+          style="
+            width: 100%;
+            border: 1px solid var(--c-line);
+            border-radius: 9px;
+            padding: 9px 12px;
+            font-size: 13px;
+            color: var(--c-text);
+            font-family: inherit;
+          "
+          placeholder="Primary"
+        >
+      </div>
+      <div>
+        <label style="display: block; font-size: 13px; font-weight: 600; color: var(--c-text); margin-bottom: 6px;">
+          Phone 2 <span style="font-weight: 400; color: var(--c-mute);">(optional)</span>
+        </label>
+        <input 
+          type="text" 
+          name="phone2" 
+          id="phone2Input" 
+          value="<%= customer ? (customer.phone2 || '') : '' %>"
+          style="
+            width: 100%;
+            border: 1px solid var(--c-line);
+            border-radius: 9px;
+            padding: 9px 12px;
+            font-size: 13px;
+            color: var(--c-text);
+            font-family: inherit;
+          "
+          placeholder="Secondary"
+        >
+      </div>
     </div>
-    <button type="submit" class="btn">Save Customer</button>
-    <a href="/customers" class="btn secondary">Cancel</a>
+
+    <!-- ===== Email & Email 2 (side by side) ===== -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+      <div>
+        <label style="display: block; font-size: 13px; font-weight: 600; color: var(--c-text); margin-bottom: 6px;">
+          Email
+        </label>
+        <input 
+          type="email" 
+          name="email" 
+          id="emailInput" 
+          value="<%= customer ? (customer.email || '') : '' %>"
+          style="
+            width: 100%;
+            border: 1px solid var(--c-line);
+            border-radius: 9px;
+            padding: 9px 12px;
+            font-size: 13px;
+            color: var(--c-text);
+            font-family: inherit;
+          "
+          placeholder="Primary"
+        >
+      </div>
+      <div>
+        <label style="display: block; font-size: 13px; font-weight: 600; color: var(--c-text); margin-bottom: 6px;">
+          Email 2 <span style="font-weight: 400; color: var(--c-mute);">(optional)</span>
+        </label>
+        <input 
+          type="email" 
+          name="email2" 
+          id="email2Input" 
+          value="<%= customer ? (customer.email2 || '') : '' %>"
+          style="
+            width: 100%;
+            border: 1px solid var(--c-line);
+            border-radius: 9px;
+            padding: 9px 12px;
+            font-size: 13px;
+            color: var(--c-text);
+            font-family: inherit;
+          "
+          placeholder="Secondary"
+        >
+      </div>
+    </div>
+
+    <!-- ===== Action Buttons ===== -->
+    <div style="display: flex; gap: 10px; padding-top: 16px; border-top: 1px solid var(--c-line);">
+      <button type="submit" class="c-btn primary">
+        <i class="bi bi-check-lg"></i> Save Customer
+      </button>
+      <a href="/customers" class="c-btn" style="text-decoration: none;">
+        <i class="bi bi-x-lg"></i> Cancel
+      </a>
+    </div>
   </form>
 </div>
 
-<%- include('../partials/footer') %>
+<%- include('../partials/console-footer') %>
+
+<script>
+  // Autocomplete & duplicate detection
+  const EXISTING_CUSTOMERS = <%- JSON.stringify(typeof existingCustomers !== 'undefined' ? existingCustomers : []) %>;
+
+  const nameInput = document.getElementById("companyNameInput");
+  const resultsBox = document.getElementById("companyResults");
+  const warningBox = document.getElementById("duplicateWarning");
+  const warningName = document.getElementById("duplicateName");
+  const warningLink = document.getElementById("duplicateEditLink");
+
+  const fields = {
+    company: document.getElementById("companyAddressInput"),
+    phone: document.getElementById("phoneInput"),
+    phone2: document.getElementById("phone2Input"),
+    email: document.getElementById("emailInput"),
+    email2: document.getElementById("email2Input"),
+  };
+
+  if (nameInput && EXISTING_CUSTOMERS.length > 0) {
+    function render(list) {
+      if (list.length === 0) { 
+        resultsBox.style.display = "none"; 
+        return; 
+      }
+      resultsBox.innerHTML = list.slice(0, 8).map(c => `
+        <div class="combo-item" data-id="${c.id}" style="
+          padding: 10px 12px;
+          border-bottom: 1px solid var(--c-line);
+          cursor: pointer;
+          font-size: 13px;
+          transition: background .1s;
+        ">
+          <strong style="color: var(--c-text);">${c.name}</strong>
+          ${c.company ? `<br><span style="font-size: 12px; color: var(--c-mute);">${c.company}</span>` : ""}
+        </div>`).join("");
+      resultsBox.style.display = "block";
+      
+      // Add hover effect
+      resultsBox.querySelectorAll('.combo-item').forEach(item => {
+        item.addEventListener('mouseenter', () => item.style.background = '#f6f9fd');
+        item.addEventListener('mouseleave', () => item.style.background = '');
+      });
+    }
+
+    function fillFrom(customer) {
+      nameInput.value = customer.name || "";
+      Object.keys(fields).forEach((key) => {
+        if (fields[key]) fields[key].value = customer[key] || "";
+      });
+
+      warningName.textContent = customer.name;
+      warningLink.href = `/customers/${customer.id}/edit`;
+      warningBox.style.display = "flex";
+      resultsBox.style.display = "none";
+    }
+
+    nameInput.addEventListener("input", () => {
+      warningBox.style.display = "none";
+
+      const q = nameInput.value.trim().toLowerCase();
+      if (!q) { 
+        resultsBox.style.display = "none"; 
+        return; 
+      }
+
+      render(EXISTING_CUSTOMERS.filter(c =>
+        (c.name || "").toLowerCase().includes(q) ||
+        (c.company || "").toLowerCase().includes(q)
+      ));
+    });
+
+    nameInput.addEventListener("focus", () => {
+      if (nameInput.value.trim()) nameInput.dispatchEvent(new Event("input"));
+    });
+
+    resultsBox.addEventListener("click", (e) => {
+      const item = e.target.closest(".combo-item");
+      if (!item) return;
+      const customer = EXISTING_CUSTOMERS.find(c => String(c.id) === item.dataset.id);
+      if (customer) fillFrom(customer);
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!nameInput.contains(e.target) && !resultsBox.contains(e.target)) {
+        resultsBox.style.display = "none";
+      }
+    });
+
+    // If editing and name matches existing, show warning
+    if (nameInput.value.trim() && !nameInput.closest('form').action.includes('/edit')) {
+      const exact = EXISTING_CUSTOMERS.find(c =>
+        (c.name || "").toLowerCase() === nameInput.value.trim().toLowerCase());
+      if (exact) fillFrom(exact);
+    }
+  }
+</script>

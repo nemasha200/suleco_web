@@ -1,169 +1,372 @@
-<%- include('../partials/header', { title: (equipment ? 'Edit' : 'Add') + ' Equipment', username, bodyClass: 'equipment-page' }) %>
+<%- include('../partials/console-header', { 
+  title: (equipment ? 'Edit' : 'Add') + ' Equipment', 
+  activeNav: 'equipment', 
+  alertCount: typeof alertCount !== 'undefined' ? alertCount : 0,
+  username: typeof username !== 'undefined' ? username : 'admin'
+}) %>
 
-<h1><%= equipment ? 'Edit Equipment' : 'Add Equipment' %></h1>
-<p class="subtitle">
-  <% if (equipment) { %>
-    Update this equipment's details below.
-  <% } else { %>
-    Search for the customer, then add every equipment item they're purchasing in one go.
-  <% } %>
-</p>
+<!-- ===== PAGE HEADER ===== -->
+<div style="margin-bottom: 28px;">
+  <h1 style="margin: 0; font-size: 28px; font-weight: 700;">
+    <i class="bi bi-plus-circle" style="color: var(--gold); margin-right: 8px;"></i>
+    <% if (equipment) { %>Edit Equipment<% } else { %>Add Equipment<% } %>
+  </h1>
+  <p style="color: #666; margin-top: 6px; font-size: 14px;">
+    <% if (equipment) { %>
+      Update this equipment's details below.
+    <% } else { %>
+      Search for the customer, then add every equipment item they're purchasing in one go.
+    <% } %>
+  </p>
+</div>
 
-<div class="card" style="max-width: 720px;">
-   <!-- Negative margins pull the strip out to the card's edges, cancelling the
-       card's own 24px padding so the blue runs corner to corner rather than
-       leaving a white border around it. -->
-  <div class="d-flex align-items-center gap-2 mb-4"
-       style="background: var(--navy); color: #fff; margin: -24px -24px 0; padding: 16px 24px; border-radius: 10px 10px 0 0;">
-    <i class="bi bi-box-seam fs-4" style="color: var(--gold);"></i>
-    <span style="font-weight:700;"><%= equipment ? 'Equipment Details' : 'New Equipment Item(s)' %></span>
+<!-- ===== FLASH MESSAGE ===== -->
+<% if (typeof flash !== 'undefined' && flash) { %>
+  <div class="alert alert-success" style="margin-bottom: 20px; display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: #d4edda; border: 1px solid #a9d4e3; border-radius: 8px; color: #155724;">
+    <i class="bi bi-check-circle-fill" style="font-size: 18px;"></i>
+    <span style="font-weight: 600;"><%= flash %></span>
   </div>
-  <form method="POST" action="<%= equipment ? '/equipment/' + equipment.id + '/edit' : '/equipment/new' %>" id="equipmentForm">
+<% } %>
 
-    <!-- Customer search-select -->
-    <div class="form-group combo-wrap">
-      <label><i class="bi bi-person-fill" style="color:var(--gold);"></i> Customer *</label>
-      <input
-        type="text"
-        id="customerSearchInput"
-        placeholder="Type to search customers…"
-        autocomplete="off"
-        value="<%= equipment ? (customers.find(c => c.id === equipment.customer_id) ? customers.find(c => c.id === equipment.customer_id).name + (customers.find(c => c.id === equipment.customer_id).company ? ' — ' + customers.find(c => c.id === equipment.customer_id).company : '') : '') : '' %>"
-        required
-      >
-      <input type="hidden" name="customer_id" id="customerIdInput" value="<%= equipment ? equipment.customer_id : '' %>" required>
-      <div id="customerResults" class="combo-results"></div>
-      <div class="hint">No customer yet? <a href="/customers/new" target="_blank">Add one first</a>, then come back and search again.</div>
-    </div>
+<div style="max-width: 900px;">
 
-        <!-- Company category — one per submission, applied to every equipment
-         item added in this batch. Stored on each equipment row so an item
-         keeps its category even if it is later moved to another customer. -->
-    <div class="form-group">
-      <label><i class="bi bi-diagram-3-fill" style="color:var(--gold);"></i> Company Category *</label>
-      <div style="display:flex; gap:24px; align-items:center; flex-wrap:wrap; margin-top:6px;">
-        <% const cat = equipment ? equipment.company_category : ''; %>
-        <label style="font-weight:400; display:flex; align-items:center; gap:6px; cursor:pointer;">
-          <input type="radio" name="company_category" value="Survey" <%= cat === 'Survey' || !cat ? 'checked' : '' %> required> Survey
-        </label>
-        <label style="font-weight:400; display:flex; align-items:center; gap:6px; cursor:pointer;">
-          <input type="radio" name="company_category" value="Lab" <%= cat === 'Lab' ? 'checked' : '' %>> Lab
-        </label>
-        <label style="font-weight:400; display:flex; align-items:center; gap:6px; cursor:pointer;">
-          <input type="radio" name="company_category" value="Drones" <%= cat === 'Drones' ? 'checked' : '' %>> Drones
-        </label>
+  <!-- ===== CUSTOMER CARD ===== -->
+  <div class="c-card">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--c-line);">
+      <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px; background: #0066cc; color: white; font-size: 18px;">
+        <i class="bi bi-person-fill"></i>
+      </div>
+      <div>
+        <div style="font-size: 15px; font-weight: 700; color: var(--c-text); margin: 0;">Customer</div>
+        <div style="font-size: 12px; color: var(--c-mute); margin-top: 2px;">Select or search for a customer</div>
       </div>
     </div>
 
-    <hr class="form-divider">
+    <form method="POST" action="<% if (equipment) { %>/equipment/<%= equipment.id %>/edit<% } else { %>/equipment/new<% } %>" id="equipmentForm">
 
-    <!-- Equipment rows -->
-    <div id="equipmentRows">
-      <% const firstType = equipment ? equipment.equipment_type : ''; %>
-      <% const firstBrand = equipment ? equipment.brand : ''; %>
-      <% const firstModel = equipment ? equipment.model : ''; %>
-      <% const firstSerial = equipment ? equipment.serial_number : ''; %>
-      <% const firstSoldByUs = equipment ? equipment.sold_by_us : ''; %>
-      <% const firstPurchaseDate = equipment ? (equipment.purchase_date || '') : ''; %>
-      <% const firstWarranty = equipment ? Number(equipment.warranty_period_months) : ''; %>
-
-      <div class="equipment-row" data-row data-row-index="0">
-        <div class="equipment-row-grid">
-          <div class="form-group option-field" data-option-field>
-            <label><i class="bi bi-tools" style="color:var(--gold);"></i> Equipment Type *</label>
-            <select name="equipment_type[]" class="option-select" required>
-              <option value="">Select type…</option>
-              <% equipmentTypes.forEach(t => { %>
-                <option value="<%= t %>" <%= firstType === t ? 'selected' : '' %>><%= t %></option>
-              <% }) %>
-              <option value="__new__">+ Add new type…</option>
-            </select>
-            <input type="text" name="equipment_type_new[]" class="option-new-input" style="display:none; margin-top:6px;" placeholder="Type new equipment type">
-          </div>
-          <div class="form-group option-field" data-option-field>
-            <label><i class="bi bi-tag-fill" style="color:var(--gold);"></i> Brand *</label>
-            <select name="brand[]" class="option-select" required>
-              <option value="">Select brand…</option>
-              <% brands.forEach(b => { %>
-                <option value="<%= b %>" <%= firstBrand === b ? 'selected' : '' %>><%= b %></option>
-              <% }) %>
-              <option value="__new__">+ Add new brand…</option>
-            </select>
-            <input type="text" name="brand_new[]" class="option-new-input" style="display:none; margin-top:6px;" placeholder="Type new brand">
-          </div>
-          <div class="form-group option-field" data-option-field>
-            <label><i class="bi bi-upc-scan" style="color:var(--gold);"></i> Model *</label>
-            <select name="model[]" class="option-select" required>
-              <option value="">Select model…</option>
-              <% models.forEach(m => { %>
-                <option value="<%= m %>" <%= firstModel === m ? 'selected' : '' %>><%= m %></option>
-              <% }) %>
-              <option value="__new__">+ Add new model…</option>
-            </select>
-            <input type="text" name="model_new[]" class="option-new-input" style="display:none; margin-top:6px;" placeholder="Type new model">
-          </div>
-          <div class="form-group">
-            <label><i class="bi bi-hash" style="color:var(--gold);"></i> Serial Number *</label>
-            <input type="text" name="serial_number[]" value="<%= firstSerial %>" placeholder="e.g. WP193069" required>
-          </div>
-          <% if (!equipment) { %>
-          <div class="row-remove-wrap">
-            <button type="button" class="row-remove-btn" onclick="removeRow(this)" title="Remove this item"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <% } %>
+      <!-- Customer Search -->
+      <div class="form-group combo-wrap" style="margin-bottom: 16px;">
+        <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.04em;">
+          <i class="bi bi-person" style="color: var(--gold); margin-right: 4px;"></i> Customer *
+        </label>
+        <input
+          type="text"
+          id="customerSearchInput"
+          placeholder="Type to search customers…"
+          autocomplete="off"
+          value="<%
+            const preset = equipment
+              ? (typeof existingCustomers !== 'undefined' && existingCustomers && existingCustomers.find ? existingCustomers.find(c => c.id === equipment.customer_id) : null)
+              : (typeof prefillCustomer !== 'undefined' && prefillCustomer ? prefillCustomer : null);
+          %><%= preset ? preset.name + (preset.company ? ' — ' + preset.company : '') : '' %>"
+          required
+          style="width: 100%; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px; background: white; color: var(--c-text);"
+        >
+        <input type="hidden" name="customer_id" id="customerIdInput" value="<%= equipment ? equipment.customer_id : (typeof prefillCustomer !== 'undefined' && prefillCustomer ? prefillCustomer.id : '') %>" required>
+        <div id="customerResults" class="combo-results" style="position: absolute; z-index: 1000; background: white; border: 1px solid var(--c-line); border-radius: 6px; max-height: 240px; overflow-y: auto; width: 100%; display: none; margin-top: 4px;"></div>
+        <div class="hint" style="margin-top: 8px; font-size: 12px; color: var(--c-mute);">
+          No customer yet? <a href="/customers/new" target="_blank" style="color: #0066cc; text-decoration: none; font-weight: 600;">Add one first</a>, then come back and search again.
         </div>
 
-        <!-- Per-item Sold By Us + warranty -->
-        <div class="form-group">
-          <label><i class="bi bi-shop" style="color:var(--gold);"></i> Sold By Us? *</label>
-          <div class="radio-group" data-sold-group>
-            <label class="radio-option">
-              <input type="radio" name="sold_by_us_group_0" value="Yes" data-sold-radio <%= firstSoldByUs === 'Yes' ? 'checked' : '' %> required>
-              Yes
+        <!-- Customer info panel -->
+        <div id="customerInfoPanel" style="display: none; margin-top: 16px; background: #f9fafb; border: 1px solid var(--c-line); border-radius: 8px; padding: 16px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px;">
+            <div>
+              <div class="hint" style="margin-bottom: 4px;">Company Address</div>
+              <div id="customerAddress" style="font-weight: 600; font-size: 13px;">—</div>
+            </div>
+            <div>
+              <div class="hint" style="margin-bottom: 4px;">Phone</div>
+              <div id="customerPhone" style="font-weight: 600; font-size: 13px;">—</div>
+            </div>
+            <div>
+              <div class="hint" style="margin-bottom: 4px;">Email</div>
+              <div id="customerEmail" style="font-weight: 600; font-size: 13px; word-break: break-all;">—</div>
+            </div>
+            <div>
+              <div class="hint" style="margin-bottom: 4px;">Equipment on file</div>
+              <div id="customerEquipmentCount" style="font-weight: 600; font-size: 13px;">—</div>
+            </div>
+          </div>
+          <div id="prefillNote" class="hint" style="display: none; margin: 0; font-size: 11px; padding-top: 12px; border-top: 1px solid var(--c-line);">
+            <i class="bi bi-magic"></i> Type, brand, model prefilled from last item — change anything that differs.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  <!-- ===== EQUIPMENT DETAILS CARD ===== -->
+  <div class="c-card">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--c-line);">
+      <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px; background: #28a745; color: white; font-size: 18px;">
+        <i class="bi bi-box-seam"></i>
+      </div>
+      <div>
+        <div style="font-size: 15px; font-weight: 700; color: var(--c-text); margin: 0;">
+          <% if (equipment) { %>Equipment Details<% } else { %>New Equipment Item(s)<% } %>
+        </div>
+        <div style="font-size: 12px; color: var(--c-mute); margin-top: 2px;">
+          <% if (!equipment) { %>Add multiple items at once<% } else { %>Update equipment information<% } %>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== EQUIPMENT ROWS ===== -->
+    <div id="equipmentRows">
+      <% 
+        const firstType = equipment ? (equipment.equipment_type || '') : '';
+        const firstBrand = equipment ? (equipment.brand || '') : '';
+        const firstModel = equipment ? (equipment.model || '') : '';
+        const firstSerial = equipment ? (equipment.serial_number || '') : '';
+        const firstSoldByUs = equipment ? (equipment.sold_by_us || 'No') : 'No';
+        const firstPurchaseDate = equipment ? (equipment.purchase_date || '') : '';
+        const firstWarranty = equipment ? Number(equipment.warranty_period_months || 0) : 0;
+      %>
+
+      <div class="equipment-row" data-row data-row-index="0" style="margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid var(--c-line);">
+
+        <!-- Equipment Type, Brand, Model, Serial (4-column grid) -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+
+          <!-- Equipment Type -->
+          <div class="form-group option-field" data-option-field>
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.04em;">
+              <i class="bi bi-tools" style="color: var(--gold); margin-right: 4px;"></i> Equipment Type *
             </label>
-            <label class="radio-option">
-              <input type="radio" name="sold_by_us_group_0" value="No" data-sold-radio <%= firstSoldByUs !== 'Yes' ? 'checked' : '' %>>
-              No
+            <select name="equipment_type[]" class="option-select" required
+                    style="width: 100%; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px; background: white;">
+              <option value="">Select type…</option>
+              <% if (typeof equipmentTypes !== 'undefined' && equipmentTypes) { %>
+                <% equipmentTypes.forEach(t => { %>
+                  <option value="<%= t %>" <% if (firstType === t) { %>selected<% } %>><%= t %></option>
+                <% }) %>
+              <% } %>
+              <option value="__new__">+ Add new type…</option>
+            </select>
+            <input type="text" name="equipment_type_new[]" class="option-new-input" style="display: none; width: 100%; margin-top: 6px; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px; background: white;" placeholder="Type new equipment type">
+          </div>
+
+          <!-- Brand -->
+          <div class="form-group option-field" data-option-field>
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.04em;">
+              <i class="bi bi-tag-fill" style="color: var(--gold); margin-right: 4px;"></i> Brand *
+            </label>
+            <select name="brand[]" class="option-select" required
+                    style="width: 100%; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px; background: white;">
+              <option value="">Select brand…</option>
+              <% if (typeof brands !== 'undefined' && brands) { %>
+                <% brands.forEach(b => { %>
+                  <option value="<%= b %>" <% if (firstBrand === b) { %>selected<% } %>><%= b %></option>
+                <% }) %>
+              <% } %>
+              <option value="__new__">+ Add new brand…</option>
+            </select>
+            <input type="text" name="brand_new[]" class="option-new-input" style="display: none; width: 100%; margin-top: 6px; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px; background: white;" placeholder="Type new brand">
+          </div>
+
+          <!-- Model -->
+          <div class="form-group option-field" data-option-field>
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.04em;">
+              <i class="bi bi-upc-scan" style="color: var(--gold); margin-right: 4px;"></i> Model *
+            </label>
+            <select name="model[]" class="option-select" required
+                    style="width: 100%; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px; background: white;">
+              <option value="">Select model…</option>
+              <% if (typeof models !== 'undefined' && models) { %>
+                <% models.forEach(m => { %>
+                  <option value="<%= m %>" <% if (firstModel === m) { %>selected<% } %>><%= m %></option>
+                <% }) %>
+              <% } %>
+              <option value="__new__">+ Add new model…</option>
+            </select>
+            <input type="text" name="model_new[]" class="option-new-input" style="display: none; width: 100%; margin-top: 6px; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px; background: white;" placeholder="Type new model">
+          </div>
+
+          <!-- Serial Number -->
+          <div class="form-group">
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.04em;">
+              <i class="bi bi-hash" style="color: var(--gold); margin-right: 4px;"></i> Serial Number *
+            </label>
+            <input type="text" name="serial_number[]" value="<%= firstSerial %>" placeholder="e.g. WP193069" required
+                   style="width: 100%; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px; background: white;">
+          </div>
+        </div>
+
+        <!-- Sold By Us? -->
+        <div style="margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--c-line);">
+          <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.04em;">
+            <i class="bi bi-shop" style="color: var(--gold); margin-right: 4px;"></i> Sold By Us? *
+          </label>
+          <div data-sold-group style="display: flex; gap: 16px;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="radio" name="sold_by_us_group_0" value="Yes" data-sold-radio <% if (firstSoldByUs === 'Yes') { %>checked<% } %> required>
+              <span style="font-size: 13px; color: var(--c-text);">Yes</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="radio" name="sold_by_us_group_0" value="No" data-sold-radio <% if (firstSoldByUs !== 'Yes') { %>checked<% } %>>
+              <span style="font-size: 13px; color: var(--c-text);">No</span>
             </label>
           </div>
           <input type="hidden" name="sold_by_us[]" data-sold-hidden value="<%= firstSoldByUs === 'Yes' ? 'Yes' : 'No' %>">
         </div>
 
-        <div class="row-warranty-fields" data-warranty-fields style="display: <%= firstSoldByUs === 'Yes' ? 'block' : 'none' %>;">
-          <div class="form-group">
-            <label><i class="bi bi-calendar-event" style="color:var(--gold);"></i> Purchase Date</label>
-            <input type="date" name="purchase_date[]" value="<%= firstPurchaseDate %>">
-          </div>
-          <div class="form-group">
-            <label><i class="bi bi-shield-check" style="color:var(--gold);"></i> Warranty Period</label>
-            <select name="warranty_period_months[]">
-              <option value="">Select warranty period…</option>
-              <% warrantyOptions.forEach(w => { %>
-                <option value="<%= w %>" <%= firstWarranty === w ? 'selected' : '' %>><%= w %> months</option>
-              <% }) %>
-            </select>
+        <!-- Warranty fields (shown only if Sold By Us = Yes) -->
+        <div class="row-warranty-fields" data-warranty-fields style="display: <% if (firstSoldByUs === 'Yes') { %>block<% } else { %>none<% } %>;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 0;">
+            <div class="form-group">
+              <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.04em;">
+                <i class="bi bi-calendar-event" style="color: var(--gold); margin-right: 4px;"></i> Purchase Date
+              </label>
+              <input type="date" name="purchase_date[]" value="<%= firstPurchaseDate %>"
+                     style="width: 100%; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px; background: white;">
+            </div>
+            <div class="form-group">
+              <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.04em;">
+                <i class="bi bi-shield-check" style="color: var(--gold); margin-right: 4px;"></i> Warranty Period
+              </label>
+              <select name="warranty_period_months[]"
+                      style="width: 100%; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px; background: white;">
+                <option value="">Select warranty period…</option>
+                <% if (typeof warrantyOptions !== 'undefined' && warrantyOptions) { %>
+                  <% warrantyOptions.forEach(w => { %>
+                    <option value="<%= w %>" <% if (firstWarranty === w) { %>selected<% } %>><%= w %> months</option>
+                  <% }) %>
+                <% } %>
+              </select>
+            </div>
           </div>
         </div>
+
+        <!-- Remove button (only in add mode) -->
+        <% if (!equipment) { %>
+          <div style="display: flex; justify-content: flex-end; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--c-line);">
+            <button type="button" class="row-remove-btn" onclick="removeRow(this)" title="Remove this item"
+                    style="padding: 8px 12px; background: #f0f0f0; border: none; border-radius: 6px; cursor: pointer; color: #999; font-size: 14px;">
+              <i class="bi bi-x-lg"></i> Remove Item
+            </button>
+          </div>
+        <% } %>
+
       </div>
     </div>
 
+    <!-- Add another equipment item button (only in add mode) -->
     <% if (!equipment) { %>
-      <button type="button" class="btn secondary" id="addRowBtn" style="margin-bottom: 20px;"><i class="bi bi-plus-lg"></i> Add Another Equipment Item</button>
+      <button type="button" class="c-btn secondary" id="addRowBtn" style="margin-top: 0;">
+        <i class="bi bi-plus-lg"></i> Add Another Equipment Item
+      </button>
     <% } %>
+  </div>
 
-    <hr class="form-divider">
+  <!-- ===== ACTION BUTTONS ===== -->
+  <div style="display: flex; gap: 12px; margin-top: 24px;">
+    <button type="submit" class="c-btn primary">
+      <i class="bi bi-check-lg"></i> <%= equipment ? 'Save Changes' : 'Save Equipment' %>
+    </button>
+    <a href="/equipment" class="c-btn secondary" style="text-decoration: none;">
+      <i class="bi bi-x-lg"></i> Cancel
+    </a>
+  </div>
 
-    <button type="submit" class="btn" style="margin-top: 8px;"><i class="bi bi-check-lg"></i> <%= equipment ? 'Save Changes' : 'Save Equipment' %></button>
-    <a href="/" class="btn secondary"><i class="bi bi-x-lg"></i> Cancel</a>
-  </form>
+    </form>
 </div>
 
+<!-- ===== STYLES ===== -->
+<style>
+  .c-card {
+    background: white;
+    border: 1px solid var(--c-line);
+    border-radius: 10px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    margin-bottom: 24px;
+  }
+
+  .c-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
+
+  .c-btn.primary {
+    background: #1AA9BC;
+    color: white;
+  }
+
+  .c-btn.primary:hover {
+    background: #138fa8;
+    transform: translateY(-1px);
+  }
+
+  .c-btn.secondary {
+    background: #f0f0f0;
+    color: #333;
+  }
+
+  .c-btn.secondary:hover {
+    background: #e0e0e0;
+  }
+
+  .hint {
+    color: var(--c-mute);
+    font-size: 12px;
+  }
+
+  .combo-results {
+    border: 1px solid var(--c-line);
+    border-radius: 6px;
+    background: white;
+  }
+
+  .combo-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .combo-item:hover {
+    background: #f9fafb;
+  }
+
+  .combo-item:last-child {
+    border-bottom: none;
+  }
+
+  .combo-empty {
+    padding: 12px;
+    text-align: center;
+    color: var(--c-mute);
+    font-size: 12px;
+  }
+
+  :root {
+    --c-line: #e8ecf1;
+    --c-mute: #7a8a99;
+    --c-text: #1a1a1a;
+    --gold: #D4AF37;
+  }
+</style>
+
+<!-- ===== SCRIPTS ===== -->
 <script>
-  // ---- Customer search combo ----
-  const CUSTOMERS = <%- JSON.stringify(customers) %>;
+  // Customer search and prefill logic
+  const CUSTOMERS = <%- JSON.stringify(typeof existingCustomers !== 'undefined' && existingCustomers ? existingCustomers : []) %>;
+  const LAST_EQUIPMENT = <%- JSON.stringify(typeof lastEquipmentByCustomer !== 'undefined' ? lastEquipmentByCustomer : {}) %>;
+  const IS_ADD_MODE = <%- equipment ? 'false' : 'true' %>;
+
   const searchInput = document.getElementById('customerSearchInput');
   const idInput = document.getElementById('customerIdInput');
   const resultsBox = document.getElementById('customerResults');
+  const infoPanel = document.getElementById('customerInfoPanel');
 
   function renderResults(list) {
     if (list.length === 0) {
@@ -173,89 +376,71 @@
     }
     resultsBox.innerHTML = list.map(c =>
       `<div class="combo-item" data-id="${c.id}" data-label="${(c.name + (c.company ? ' — ' + c.company : '')).replace(/"/g, '&quot;')}">
-        <strong>${c.name}</strong>${c.company ? ' — ' + c.company : ''}
+        <strong>${c.name}</strong>${c.company ? '<br><span class="hint">' + c.company + '</span>' : ''}
       </div>`
     ).join('');
     resultsBox.style.display = 'block';
   }
 
   searchInput.addEventListener('focus', () => {
-    renderResults(CUSTOMERS);
+    if (CUSTOMERS.length > 0 && !searchInput.value.trim()) renderResults(CUSTOMERS);
   });
 
   searchInput.addEventListener('input', () => {
-    idInput.value = ''; // typing invalidates any previously selected id until they pick again
+    idInput.value = '';
+    infoPanel.style.display = 'none';
     const q = searchInput.value.trim().toLowerCase();
-    const filtered = CUSTOMERS.filter(c =>
-      c.name.toLowerCase().includes(q) || (c.company || '').toLowerCase().includes(q)
+    if (!q) {
+      resultsBox.style.display = 'none';
+      return;
+    }
+    const matches = CUSTOMERS.filter(c =>
+      c.name.toLowerCase().includes(q) || (c.company && c.company.toLowerCase().includes(q))
     );
-    renderResults(filtered);
+    renderResults(matches);
   });
 
   resultsBox.addEventListener('click', (e) => {
     const item = e.target.closest('.combo-item');
     if (!item) return;
-    idInput.value = item.dataset.id;
-    searchInput.value = item.dataset.label;
+    const customerId = item.dataset.id;
+    const label = item.dataset.label;
+    searchInput.value = label;
+    idInput.value = customerId;
     resultsBox.style.display = 'none';
+
+    showCustomerInfo(customerId);
   });
 
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.combo-wrap')) resultsBox.style.display = 'none';
-  });
+  function showCustomerInfo(customerId) {
+    const c = CUSTOMERS.find(x => x.id == customerId);
+    if (!c) { infoPanel.style.display = 'none'; return; }
 
-  // ---- Dynamic equipment rows (Add mode only) ----
-  const rowsWrap = document.getElementById('equipmentRows');
-  const addRowBtn = document.getElementById('addRowBtn');
-  let rowCounter = 1; // row 0 already exists in the markup
+    document.getElementById('customerAddress').textContent = c.company || '—';
+    document.getElementById('customerPhone').textContent = (c.phone || c.phone2 || '—');
+    document.getElementById('customerEmail').textContent = (c.email || c.email2 || '—');
 
-  if (addRowBtn) {
-    addRowBtn.addEventListener('click', () => {
-      const template = rowsWrap.querySelector('[data-row]').cloneNode(true);
-      const newIndex = rowCounter++;
+    const lastEq = LAST_EQUIPMENT[customerId];
+    document.getElementById('customerEquipmentCount').textContent = (lastEq && lastEq.count !== undefined ? lastEq.count + ' item(s)' : '—');
 
-      template.setAttribute('data-row-index', newIndex);
+    infoPanel.style.display = 'block';
 
-      template.querySelectorAll('input, select').forEach(el => {
-        if (el.classList.contains('option-new-input')) {
-          el.style.display = 'none';
-          el.required = false;
-          el.value = '';
-        } else if (el.tagName === 'SELECT') {
-          el.selectedIndex = 0;
-        } else if (el.type === 'radio') {
-          // give this row's radios their own group name so toggling one
-          // row never affects another row's selection
-          el.name = 'sold_by_us_group_' + newIndex;
-          el.checked = (el.value === 'No');
-        } else if (el.type === 'hidden') {
-          el.value = 'No';
-        } else {
-          el.value = '';
-        }
-      });
-
-      // reset this row's warranty visibility to hidden (defaults to "No")
-      const warrantyBox = template.querySelector('[data-warranty-fields]');
-      if (warrantyBox) warrantyBox.style.display = 'none';
-
-      rowsWrap.appendChild(template);
-    });
+    if (IS_ADD_MODE && lastEq && (lastEq.type || lastEq.brand || lastEq.model)) {
+      document.getElementById('prefillNote').style.display = 'block';
+    }
   }
 
-  function removeRow(btn) {
-    const rows = rowsWrap.querySelectorAll('[data-row]');
-    if (rows.length <= 1) return; // always keep at least one row
-    btn.closest('[data-row]').remove();
+  if (idInput.value) {
+    showCustomerInfo(idInput.value);
   }
 
-  // ---- Per-item Sold By Us toggle, and "+ Add new…" option reveal ----
-  // Delegated listener so it works for rows added dynamically too.
-  rowsWrap.addEventListener('change', (e) => {
-    if (e.target.matches('.option-select')) {
-      const wrap = e.target.closest('[data-option-field]');
+  // Option select (type/brand/model): "+ Add new"
+  function wireOptionSelect(select) {
+    select.addEventListener('change', () => {
+      const wrap = select.closest('[data-option-field]');
+      if (!wrap) return;
       const newInput = wrap.querySelector('.option-new-input');
-      if (e.target.value === '__new__') {
+      if (select.value === '__new__') {
         newInput.style.display = 'block';
         newInput.required = true;
         newInput.value = '';
@@ -265,24 +450,64 @@
         newInput.required = false;
         newInput.value = '';
       }
-    }
+    });
+  }
+  document.querySelectorAll('.option-select').forEach(wireOptionSelect);
 
-    if (e.target.matches('[data-sold-radio]')) {
-      updateRowSoldState(e.target.closest('[data-row]'));
-    }
+  // Sold By Us? -> show/hide warranty fields
+  document.addEventListener('change', (e) => {
+    const radio = e.target.closest('[data-sold-radio]');
+    if (!radio) return;
+    const row = radio.closest('.equipment-row');
+    if (!row) return;
+
+    const group = row.querySelector('[data-sold-group]');
+    const yesRadio = group.querySelector('[value="Yes"]');
+    const isYes = yesRadio.checked;
+
+    const warrantyFields = row.querySelector('[data-warranty-fields]');
+    const hiddenField = row.querySelector('[data-sold-hidden]');
+
+    warrantyFields.style.display = isYes ? 'block' : 'none';
+    hiddenField.value = isYes ? 'Yes' : 'No';
   });
 
-  function updateRowSoldState(row) {
-    const selected = row.querySelector('[data-sold-radio]:checked');
-    const isYes = !!selected && selected.value === 'Yes';
-    const hidden = row.querySelector('[data-sold-hidden]');
-    const warrantyBox = row.querySelector('[data-warranty-fields]');
-    if (hidden) hidden.value = isYes ? 'Yes' : 'No';
-    if (warrantyBox) warrantyBox.style.display = isYes ? 'block' : 'none';
-  }
+  // Add another equipment item
+  document.getElementById('addRowBtn').addEventListener('click', () => {
+    const rows = document.getElementById('equipmentRows');
+    const firstRow = rows.querySelector('.equipment-row');
+    const clone = firstRow.cloneNode(true);
 
-  // run once on load for every existing row (handles edit mode prefill)
-  rowsWrap.querySelectorAll('[data-row]').forEach(updateRowSoldState);
+    const idx = rows.querySelectorAll('.equipment-row').length;
+    clone.dataset.rowIndex = idx;
+
+    clone.querySelectorAll('input, select').forEach(el => {
+      el.value = '';
+      const origName = el.name;
+      if (origName) el.name = origName.replace(/\[\]/, '').replace(/_0(?![0-9])/, '_' + idx) + '[]';
+      if (el.type === 'radio') el.name = origName.replace(/_0(?![0-9])/, '_' + idx);
+    });
+
+    clone.querySelectorAll('[data-sold-hidden]').forEach(el => el.value = 'No');
+    clone.querySelectorAll('[data-warranty-fields]').forEach(el => el.style.display = 'none');
+
+    rows.appendChild(clone);
+
+    clone.querySelectorAll('.option-select').forEach(wireOptionSelect);
+  });
+
+  // Remove equipment item
+  window.removeRow = function (btn) {
+    const rows = document.getElementById('equipmentRows');
+    const rowsCount = rows.querySelectorAll('.equipment-row').length;
+    if (rowsCount <= 1) {
+      if (confirm('This will clear the form. Continue?')) {
+        btn.closest('.equipment-row').querySelectorAll('input, select').forEach(el => el.value = '');
+      }
+      return;
+    }
+    btn.closest('.equipment-row').remove();
+  };
 </script>
 
-<%- include('../partials/footer') %>
+<%- include('../partials/console-footer') %>

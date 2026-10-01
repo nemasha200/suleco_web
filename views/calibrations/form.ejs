@@ -1,196 +1,312 @@
-<%- include('../partials/header', { title: 'Calibrations', username, bodyClass: 'calibrations-page' }) %>
+<%- include('../partials/console-header', { 
+  title: 'Check In', 
+  activeNav: 'services', 
+  alertCount: typeof alertCount !== 'undefined' ? alertCount : 0,
+  username: typeof username !== 'undefined' ? username : 'admin'
+}) %>
 
-<h1>Add Service</h1>
-<p class="subtitle">Search by serial number, then log this calibration for that equipment.</p>
+<!-- ===== PAGE HEADER ===== -->
+<div style="margin-bottom: 28px;">
+  <h1 style="margin: 0; font-size: 28px; font-weight: 700;"><i class="bi bi-box-arrow-in-down" style="color: var(--gold); margin-right: 8px;"></i>Check In</h1>
+  <p style="color: #666; margin-top: 6px; font-size: 14px;">Step 1 of 3 — log the instrument in. Approval and service come next.</p>
+</div>
 
+<!-- ===== FLASH MESSAGE ===== -->
 <% if (typeof flash !== 'undefined' && flash) { %>
-  <div class="empty-state" style="border-color:#2e7d32; color:#2e7d32;"><%= flash %></div>
+  <div class="alert alert-success" style="margin-bottom: 20px; display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: #d4edda; border: 1px solid #a9d4e3; border-radius: 8px; color: #155724;">
+    <i class="bi bi-check-circle-fill" style="font-size: 18px;"></i>
+    <span style="font-weight: 600;"><%= flash %></span>
+  </div>
 <% } %>
 
-<div class="card" style="max-width: 760px;">
-  <!-- Negative margins pull the strip out to the card's edges, cancelling the
-       card's own 24px padding so the blue runs corner to corner. -->
-  <div class="d-flex align-items-center gap-2 mb-4"
-       style="background: var(--navy); color: #fff; margin: -24px -24px 0; padding: 16px 24px; border-radius: 10px 10px 0 0;">
-    <i class="bi bi-clipboard-check fs-4" style="color: var(--gold);"></i>
-    <span style="font-weight:700;">New Service Record</span>
+<!-- ===== CHECK IN FORM CARD ===== -->
+<div class="c-card" style="margin-bottom: 24px;">
+  <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--c-line);">
+    <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px; background: #0066cc; color: white; font-size: 18px;">
+      <i class="bi bi-box-arrow-in-down"></i>
+    </div>
+    <div>
+      <div style="font-size: 15px; font-weight: 700; color: var(--c-text); margin: 0;">Group 1 — Check In</div>
+      <div style="font-size: 12px; color: var(--c-mute); margin-top: 2px;">Start a new service record</div>
+    </div>
+    <span class="badge" style="margin-left: auto; background: #e3f2fd; color: #0066cc; padding: 4px 12px; border-radius: 12px; font-weight: 600; font-size: 11px;">Step 1 of 3</span>
   </div>
 
-  <form method="POST" action="/calibrations/new" id="calibrationForm">
+  <form method="POST" action="/calibrations/new" id="checkInForm">
 
-    <!-- Serial number search-select -->
-    <div class="form-group combo-wrap">
-      <label><i class="bi bi-hash" style="color:var(--gold);"></i> Serial Number *</label>
+    <!-- Serial Number Search -->
+    <div class="form-group combo-wrap" style="margin-bottom: 20px;">
+      <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.04em;">
+        <i class="bi bi-hash" style="color: var(--gold); margin-right: 4px;"></i> Serial Number *
+      </label>
       <input
         type="text"
         id="serialSearchInput"
         placeholder="Type to search by serial number…"
         autocomplete="off"
         required
+        style="width: 100%; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px; background: white; color: var(--c-text);"
       >
       <input type="hidden" name="equipment_id" id="equipmentIdInput" required>
-      <div id="serialResults" class="combo-results"></div>
-      <div class="hint">No equipment yet? <a href="/equipment/new" target="_blank">Add equipment first</a>, then come back and search again.</div>
+      <div id="serialResults" class="combo-results" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--c-line); border-top: none; border-radius: 0 0 6px 6px; max-height: 300px; overflow-y: auto; z-index: 100; margin-top: -1px;"></div>
+      <div class="hint" style="margin-top: 6px; font-size: 12px; color: var(--c-mute);">
+        No equipment yet? <a href="/equipment/new" style="color: #0066cc; text-decoration: none;">Add equipment first</a>, then come back and search again.
+      </div>
     </div>
 
-    <!-- Auto-filled info, shown once a serial number is picked -->
-    <div id="equipmentInfoPanel" style="display:none; margin-bottom: 24px;">
-      <div style="background: #fff; border: 1px solid #E3E7EE; border-radius: 10px; padding: 18px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px 28px;">
+    <!-- Equipment Info Panel (shown after selection) -->
+    <div id="equipmentInfoPanel" style="display: none; margin-bottom: 20px; padding: 18px; background: #f9fafb; border: 1px solid var(--c-line); border-radius: 8px;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px 28px; margin-bottom: 16px;">
         <div>
-          <div class="hint" style="margin-bottom: 3px;">Company / Client Name</div>
-          <div id="infoCompanyName" style="font-weight: 600; font-size: 15px;">—</div>
+          <div class="hint" style="margin-bottom: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">Company / Client</div>
+          <div id="infoCompanyName" style="font-weight: 600; font-size: 14px; color: var(--c-text);">—</div>
         </div>
         <div>
-          <div class="hint" style="margin-bottom: 3px;">Equipment Type</div>
-          <div id="infoEquipmentType" style="font-weight: 600; font-size: 15px;">—</div>
+          <div class="hint" style="margin-bottom: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">Equipment Type</div>
+          <div id="infoEquipmentType" style="font-weight: 600; font-size: 14px; color: var(--c-text);">—</div>
         </div>
         <div>
-          <div class="hint" style="margin-bottom: 3px;">Model</div>
-          <div id="infoModel" style="font-weight: 600; font-size: 15px;">—</div>
+          <div class="hint" style="margin-bottom: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">Brand</div>
+          <div id="infoBrand" style="font-weight: 600; font-size: 14px; color: var(--c-text);">—</div>
         </div>
         <div>
-          <div class="hint" style="margin-bottom: 3px;">Brand</div>
-          <div id="infoBrand" style="font-weight: 600; font-size: 15px;">—</div>
+          <div class="hint" style="margin-bottom: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">Model</div>
+          <div id="infoModel" style="font-weight: 600; font-size: 14px; color: var(--c-text);">—</div>
+        </div>
+        <div>
+          <div class="hint" style="margin-bottom: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">Sold by Us</div>
+          <div id="infoSoldByUs" style="font-weight: 600; font-size: 14px; display: inline-block; padding: 4px 12px; border-radius: 12px;">—</div>
+        </div>
+        <div>
+          <div class="hint" style="margin-bottom: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">Warranty</div>
+          <div id="infoWarranty" style="font-weight: 600; font-size: 14px; color: var(--c-text);">—</div>
         </div>
       </div>
 
-      <div style="margin-top: 14px;">
-        <div class="hint" style="margin-bottom: 8px;"><i class="bi bi-clock-history"></i> Calibrations History (all dates)</div>
+      <div style="padding-top: 16px; border-top: 1px solid var(--c-line);">
+        <div class="hint" style="margin-bottom: 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">
+          <i class="bi bi-clock-history" style="margin-right: 6px;"></i> Calibration History
+        </div>
         <div id="infoDoneDates" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
       </div>
     </div>
 
-    <hr class="form-divider">
+    <hr style="border: none; border-top: 1px solid var(--c-line); margin: 20px 0;">
 
-    <!-- Calibration description, with "+ Add new" like the equipment dropdowns -->
-    <div class="form-group option-field" data-option-field>
-      <label><i class="bi bi-card-list" style="color:var(--gold);"></i> Calibration Description *</label>
-      <select name="description" class="option-select" required>
+    <!-- Check In Date -->
+    <div class="form-group" style="margin-bottom: 20px;">
+      <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.04em;">
+        <i class="bi bi-calendar-plus" style="color: var(--gold); margin-right: 4px;"></i> Check In Date *
+      </label>
+      <input 
+        type="date" 
+        name="check_in_date" 
+        id="checkInDate" 
+        required
+        style="width: 100%; max-width: 300px; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px; background: white; color: var(--c-text);"
+      >
+    </div>
+
+    <!-- Service Description -->
+    <div class="form-group option-field" data-option-field style="margin-bottom: 20px;">
+      <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.04em;">
+        <i class="bi bi-card-list" style="color: var(--gold); margin-right: 4px;"></i> Service Description *
+      </label>
+      <select 
+        name="description" 
+        class="option-select" 
+        required
+        style="width: 100%; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px; background: white; color: var(--c-text);"
+      >
         <option value="">Select…</option>
-        <% descriptionOptions.forEach(d => { %>
-          <option value="<%= d %>"><%= d %></option>
-        <% }) %>
-        <option value="__new__">+ Add calibration description…</option>
+        <% if (typeof descriptionOptions !== 'undefined') { %>
+          <% descriptionOptions.forEach(d => { %>
+            <option value="<%= d %>"><%= d %></option>
+          <% }) %>
+        <% } %>
+        <option value="__new__">+ Add service description…</option>
       </select>
-      <input type="text" name="description_new" class="option-new-input" style="display:none; margin-top:6px;" placeholder="Type new calibration description">
+      <input 
+        type="text" 
+        name="description_new" 
+        class="option-new-input" 
+        style="display: none; width: 100%; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px; background: white; color: var(--c-text);" 
+        placeholder="Type new service description"
+      >
     </div>
 
-    <div class="form-group">
-      <label><i class="bi bi-check2-square" style="color:var(--gold);"></i> Calibration Done? *</label>
-      <div class="radio-group">
-        <label class="radio-option">
-          <input type="radio" name="done" value="Yes" data-done-radio required>
-          Done
-        </label>
-        <label class="radio-option">
-          <input type="radio" name="done" value="No" data-done-radio checked>
-          Not
-        </label>
-      </div>
+    <!-- Buttons -->
+    <div style="display: flex; gap: 12px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--c-line);">
+      <button type="submit" class="c-btn primary" style="display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; background: #1AA9BC; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
+        <i class="bi bi-check-lg"></i> Save Check In
+      </button>
+      <a href="/calibrations" class="c-btn secondary" style="display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; background: #f0f0f0; color: #333; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; text-decoration: none;">
+        <i class="bi bi-x-lg"></i> Cancel
+      </a>
     </div>
-
-    <!-- Repeatable Service + Amount rows, shown only when Done = Yes -->
-    <div id="serviceFields" style="display:none;" class="form-group">
-      <label>Calibration Services &amp; Amounts</label>
-      <div data-repeatable-group="service">
-        <div data-repeatable-rows>
-          <div class="repeatable-row" data-repeatable-row>
-            <input type="text" name="service_description[]" placeholder="Calibration performed…">
-            <div class="input-group">
-              <span class="input-group-text">Rs.</span>
-              <input type="number" step="0.01" min="0" name="service_amount[]" placeholder="Amount">
-            </div>
-            <button type="button" class="row-remove-btn" data-remove-row title="Remove"><i class="bi bi-x-lg"></i></button>
-          </div>
-        </div>
-        <button type="button" class="btn secondary btn-sm mt-2" data-add-row><i class="bi bi-plus-lg"></i> Add Another Calibration &amp; Amount</button>
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label><i class="bi bi-wrench-adjustable" style="color:var(--gold);"></i> Repair? *</label>
-      <div class="radio-group">
-        <label class="radio-option">
-          <input type="radio" name="repair" value="Yes" data-repair-radio required>
-          Yes
-        </label>
-        <label class="radio-option">
-          <input type="radio" name="repair" value="No" data-repair-radio checked>
-          No
-        </label>
-      </div>
-    </div>
-
-    <div id="repairFields" style="display:none;">
-      <!-- Repeatable Spare Part + Amount rows -->
-      <div class="form-group">
-        <label>1. Spare Part Replacement</label>
-        <div data-repeatable-group="spare_part">
-          <div data-repeatable-rows>
-            <div class="repeatable-row" data-repeatable-row>
-              <input type="text" name="spare_part_description[]" placeholder="Spare part…">
-              <div class="input-group">
-                <span class="input-group-text">Rs.</span>
-                <input type="number" step="0.01" min="0" name="spare_part_amount[]" placeholder="Amount">
-              </div>
-              <button type="button" class="row-remove-btn" data-remove-row title="Remove"><i class="bi bi-x-lg"></i></button>
-            </div>
-          </div>
-          <button type="button" class="btn secondary btn-sm mt-2" data-add-row><i class="bi bi-plus-lg"></i> Add Another Spare Part &amp; Amount</button>
-        </div>
-      </div>
-
-      <!-- Repeatable Repair Service + Amount rows -->
-      <div class="form-group">
-        <label>2. Description of Repair</label>
-        <div data-repeatable-group="repair_item">
-          <div data-repeatable-rows>
-            <div class="repeatable-row" data-repeatable-row>
-              <input type="text" name="repair_item_description[]" placeholder="Type of service & repair…">
-              <div class="input-group">
-                <span class="input-group-text">Rs.</span>
-                <input type="number" step="0.01" min="0" name="repair_item_amount[]" placeholder="Amount">
-              </div>
-              <button type="button" class="row-remove-btn" data-remove-row title="Remove"><i class="bi bi-x-lg"></i></button>
-            </div>
-          </div>
-          <button type="button" class="btn secondary btn-sm mt-2" data-add-row><i class="bi bi-plus-lg"></i> Add Another Service &amp; Amount</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="totalAmountRow" style="display:none; text-align:right; font-weight:700; color:var(--navy); margin-bottom: 16px;">
-      Total: Rs. <span id="totalAmountValue">0.00</span>
-    </div>
-
-    <div class="form-group">
-      <label><i class="bi bi-info-circle" style="color:var(--gold);"></i> Status</label>
-      <input type="text" name="status" placeholder="e.g. Passed, Needs parts, Sent for repair…">
-    </div>
-
-    <div class="form-group">
-      <label><i class="bi bi-calendar-check" style="color:var(--gold);"></i> Done Date</label>
-      <input type="date" name="done_date" id="doneDateInput">
-    </div>
-
-    <button type="submit" class="btn" style="margin-top: 8px;"><i class="bi bi-check-lg"></i> Save Calibration</button>
-    <a href="/calibrations" class="btn secondary"><i class="bi bi-x-lg"></i> Cancel</a>
   </form>
 </div>
 
+<!-- ===== JOBS IN PROGRESS ===== -->
+<% if (typeof pending !== 'undefined' && pending.length > 0) { %>
+  <div class="c-card">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--c-line);">
+      <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px; background: #f59e0b; color: white; font-size: 18px;">
+        <i class="bi bi-hourglass-split"></i>
+      </div>
+      <div>
+        <div style="font-size: 15px; font-weight: 700; color: var(--c-text); margin: 0;">Jobs in Progress</div>
+        <div style="font-size: 12px; color: var(--c-mute); margin-top: 2px;">Continue where you left off</div>
+      </div>
+      <span class="badge" style="margin-left: auto; background: #fef3c7; color: #92400e; padding: 4px 12px; border-radius: 12px; font-weight: 600; font-size: 11px;"><%= pending.length %></span>
+    </div>
+
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <thead style="background: #f9f9f9; border-bottom: 2px solid var(--c-line);">
+          <tr>
+            <th style="padding: 12px 14px; text-align: left; font-weight: 600; color: var(--c-mute); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Serial</th>
+            <th style="padding: 12px 14px; text-align: left; font-weight: 600; color: var(--c-mute); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Customer</th>
+            <th style="padding: 12px 14px; text-align: left; font-weight: 600; color: var(--c-mute); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Checked In</th>
+            <th style="padding: 12px 14px; text-align: left; font-weight: 600; color: var(--c-mute); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Next Step</th>
+            <th style="padding: 12px 14px; text-align: left; font-weight: 600; color: var(--c-mute); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% pending.forEach(p => { %>
+            <tr style="border-bottom: 1px solid var(--c-line);">
+              <td style="padding: 12px 14px; color: var(--c-text);">
+                <strong><%= p.serial_number || '—' %></strong>
+                <br><span style="font-size: 11px; color: var(--c-mute);"><%= [p.brand, p.equipment_type].filter(Boolean).join(' ') %></span>
+              </td>
+              <td style="padding: 12px 14px; color: var(--c-text);">
+                <%= p.customer_name %>
+                <br><span style="font-size: 11px; color: var(--c-mute);"><%= p.description || '' %></span>
+              </td>
+              <td style="padding: 12px 14px; color: var(--c-text); font-size: 12px;">
+                <%= p.check_in_date || '—' %>
+              </td>
+              <td style="padding: 12px 14px; color: var(--c-text);">
+                <% if (p.stage === 'approval') { %>
+                  <span class="badge" style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 10px;">Approval</span>
+                <% } else { %>
+                  <span class="badge" style="background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 10px;">Service</span>
+                <% } %>
+              </td>
+              <td style="padding: 12px 14px; text-align: right;">
+                <a href="/calibrations/<%= p.id %>/workflow" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: #0066cc; color: white; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 12px;">
+                  <i class="bi bi-arrow-right-circle" style="font-size: 14px;"></i> Continue
+                </a>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>
+
+<!-- ===== STYLES ===== -->
+<style>
+  .c-card {
+    background: white;
+    border: 1px solid var(--c-line);
+    border-radius: 10px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    margin-bottom: 24px;
+  }
+
+  .c-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
+
+  .c-btn.primary {
+    background: #1AA9BC;
+    color: white;
+  }
+
+  .c-btn.primary:hover {
+    background: #138fa8;
+    transform: translateY(-1px);
+  }
+
+  .c-btn.secondary {
+    background: #f0f0f0;
+    color: #333;
+  }
+
+  .c-btn.secondary:hover {
+    background: #e0e0e0;
+  }
+
+  .combo-wrap {
+    position: relative;
+  }
+
+  .combo-results {
+    background: white;
+    border: 1px solid var(--c-line);
+    border-radius: 6px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .combo-item {
+    padding: 10px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--c-line);
+    font-size: 13px;
+  }
+
+  .combo-item:hover {
+    background: #f9fafb;
+  }
+
+  .combo-empty {
+    padding: 12px;
+    text-align: center;
+    color: var(--c-mute);
+    font-size: 12px;
+  }
+
+  .hint {
+    color: var(--c-mute);
+    font-size: 12px;
+  }
+
+  :root {
+    --c-line: #e8ecf1;
+    --c-mute: #7a8a99;
+    --c-text: #1a1a1a;
+    --gold: #D4AF37;
+  }
+</style>
+
 <script>
-  const EQUIPMENT_LIST = <%- JSON.stringify(equipmentList) %>;
-  const DONE_DATES_BY_EQUIPMENT = <%- JSON.stringify(doneDatesByEquipment) %>;
+  const EQUIPMENT_LIST = <%- JSON.stringify(typeof equipmentList !== 'undefined' ? equipmentList : []) %>;
+  const DONE_DATES_BY_EQUIPMENT = <%- JSON.stringify(typeof doneDatesByEquipment !== 'undefined' ? doneDatesByEquipment : {}) %>;
 
   const searchInput = document.getElementById('serialSearchInput');
   const idInput = document.getElementById('equipmentIdInput');
   const resultsBox = document.getElementById('serialResults');
   const infoPanel = document.getElementById('equipmentInfoPanel');
-  const infoCompanyName = document.getElementById('infoCompanyName');
-  const infoEquipmentType = document.getElementById('infoEquipmentType');
-  const infoModel = document.getElementById('infoModel');
-  const infoBrand = document.getElementById('infoBrand');
-  const infoDoneDates = document.getElementById('infoDoneDates');
+  const checkInDate = document.getElementById('checkInDate');
+
+  // Default to today's date
+  if (checkInDate && !checkInDate.value) {
+    checkInDate.value = new Date().toISOString().split('T')[0];
+  }
 
   function companyLabel(e) {
     if (e.customer_company && e.customer_company.trim() && e.customer_company.trim() !== (e.customer_name || '').trim()) {
@@ -201,6 +317,32 @@
 
   function equipmentSummary(e) {
     return [e.brand, e.equipment_type].filter(Boolean).join(' ') || '—';
+  }
+
+  function prettyDate(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return iso;
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  function warrantyLabel(e) {
+    const months = Number(e.warranty_period_months);
+    if (!months) return '—';
+    const base = `${months} month${months === 1 ? '' : 's'}`;
+    if (!e.purchase_date) return base;
+    const end = new Date(e.purchase_date);
+    if (isNaN(end)) return base;
+    end.setMonth(end.getMonth() + months);
+    const endStr = end.toISOString().split('T')[0];
+    return `${base} — ${end < new Date() ? 'expired' : 'valid until'} ${endStr}`;
+  }
+
+  function paintSoldByUs(value) {
+    const infoSoldByUs = document.getElementById('infoSoldByUs');
+    infoSoldByUs.textContent = value;
+    infoSoldByUs.style.color = '#B3261E';
+    infoSoldByUs.style.background = '#FDECEA';
+    infoSoldByUs.style.border = '1px solid #F5C2BD';
   }
 
   function labelFor(e) {
@@ -247,24 +389,45 @@
     searchInput.value = labelFor(equipment);
     resultsBox.style.display = 'none';
 
-    infoCompanyName.textContent = companyLabel(equipment);
-    infoEquipmentType.textContent = equipment.equipment_type || '—';
-    infoModel.textContent = equipment.model || '—';
-    infoBrand.textContent = equipment.brand || '—';
+    document.getElementById('infoCompanyName').textContent = companyLabel(equipment);
+    document.getElementById('infoEquipmentType').textContent = equipment.equipment_type || '—';
+    document.getElementById('infoModel').textContent = equipment.model || '—';
+    document.getElementById('infoBrand').textContent = equipment.brand || '—';
+    paintSoldByUs((equipment.sold_by_us || 'No').trim() === 'Yes' ? 'Yes' : 'No');
+    document.getElementById('infoWarranty').textContent = warrantyLabel(equipment);
 
     const history = DONE_DATES_BY_EQUIPMENT[equipment.id] || [];
+    const infoDoneDates = document.getElementById('infoDoneDates');
     infoDoneDates.innerHTML = history.length
-      ? history.map(d => `<span class="badge badge-grey">${d}</span>`).join('')
+      ? history.map((d, i) => `
+          <span style="display:inline-flex; align-items:center; gap:6px;
+                       padding:6px 12px; border-radius:12px;
+                       font-size:12px; font-weight:600;
+                       color:${i === 0 ? '#0A3648' : '#5A6B7F'};
+                       background:${i === 0 ? '#E7F3F7' : '#F4F6F9'};
+                       border:1px solid ${i === 0 ? '#A9D4E3' : '#E3E7EE'};">
+            <i class="bi bi-calendar-check"></i>
+            ${prettyDate(d)}${i === 0 ? ' · latest' : ''}
+          </span>`).join('')
       : '<span class="hint">No previous calibrations yet</span>';
 
     infoPanel.style.display = 'block';
   });
 
+  const PREFILL_EQUIPMENT_ID = '<%= typeof prefillEquipmentId !== "undefined" ? prefillEquipmentId : "" %>';
+  if (PREFILL_EQUIPMENT_ID) {
+    const preset = EQUIPMENT_LIST.find(e => String(e.id) === PREFILL_EQUIPMENT_ID);
+    if (preset) {
+      renderResults([preset]);
+      const item = resultsBox.querySelector('.combo-item');
+      if (item) item.click();
+    }
+  }
+
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.combo-wrap')) resultsBox.style.display = 'none';
   });
 
-  // ---- Calibration Description "+ Add new…" reveal ----
   document.querySelectorAll('.option-select').forEach((select) => {
     select.addEventListener('change', () => {
       const wrap = select.closest('[data-option-field]');
@@ -281,79 +444,6 @@
       }
     });
   });
-
-  // ---- Calibration Done? toggle ----
-  const serviceFields = document.getElementById('serviceFields');
-  document.querySelectorAll('[data-done-radio]').forEach((radio) => {
-    radio.addEventListener('change', () => {
-      const yesChecked = document.querySelector('[data-done-radio][value="Yes"]').checked;
-      serviceFields.style.display = yesChecked ? 'block' : 'none';
-      updateTotal();
-    });
-  });
-
-  // ---- Repair? toggle ----
-  const repairFields = document.getElementById('repairFields');
-  document.querySelectorAll('[data-repair-radio]').forEach((radio) => {
-    radio.addEventListener('change', () => {
-      const yesChecked = document.querySelector('[data-repair-radio][value="Yes"]').checked;
-      repairFields.style.display = yesChecked ? 'block' : 'none';
-      updateTotal();
-    });
-  });
-
-  // ---- Generic repeatable row groups (Services / Spare Parts / Repair Items) ----
-  function initRepeatableGroup(groupEl) {
-    const rowsWrap = groupEl.querySelector('[data-repeatable-rows]');
-    const addBtn = groupEl.querySelector('[data-add-row]');
-
-    addBtn.addEventListener('click', () => {
-      const firstRow = rowsWrap.querySelector('[data-repeatable-row]');
-      const clone = firstRow.cloneNode(true);
-      clone.querySelectorAll('input').forEach((el) => { el.value = ''; });
-      rowsWrap.appendChild(clone);
-    });
-
-    rowsWrap.addEventListener('click', (e) => {
-      const removeBtn = e.target.closest('[data-remove-row]');
-      if (!removeBtn) return;
-      const rows = rowsWrap.querySelectorAll('[data-repeatable-row]');
-      if (rows.length <= 1) {
-        // keep at least one row, just clear it instead of removing
-        removeBtn.closest('[data-repeatable-row]').querySelectorAll('input').forEach((el) => { el.value = ''; });
-        return;
-      }
-      removeBtn.closest('[data-repeatable-row]').remove();
-      updateTotal();
-    });
-  }
-
-  document.querySelectorAll('[data-repeatable-group]').forEach(initRepeatableGroup);
-
-  // ---- Live running total across all visible amount inputs ----
-  const totalAmountRow = document.getElementById('totalAmountRow');
-  const totalAmountValue = document.getElementById('totalAmountValue');
-
-  function updateTotal() {
-    const amountInputs = document.querySelectorAll('input[name$="_amount[]"]');
-    let total = 0;
-    let anyVisible = false;
-    amountInputs.forEach((input) => {
-      const row = input.closest('[data-repeatable-row]');
-      const group = input.closest('[id="serviceFields"], [id="repairFields"]');
-      const groupVisible = group ? group.style.display !== 'none' : true;
-      if (groupVisible) {
-        anyVisible = true;
-        total += Number(input.value) || 0;
-      }
-    });
-    totalAmountRow.style.display = anyVisible ? 'block' : 'none';
-    totalAmountValue.textContent = total.toFixed(2);
-  }
-
-  document.getElementById('calibrationForm').addEventListener('input', (e) => {
-    if (e.target.matches('input[name$="_amount[]"]')) updateTotal();
-  });
 </script>
 
-<%- include('../partials/footer') %>
+<%- include('../partials/console-footer') %>

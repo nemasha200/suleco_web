@@ -1,61 +1,207 @@
-<%- include('partials/header', { title: 'Notification Log — Calibration Tracker', username }) %>
+<%- include('partials/console-header', { 
+  title: 'Notifications', 
+  activeNav: 'notifications', 
+  alertCount: typeof alertCount !== 'undefined' ? alertCount : 0,
+  username: typeof username !== 'undefined' ? username : 'admin'
+}) %>
 
-<h1>Notification Log</h1>
-<p class="subtitle">Most recent 200 reminder attempts (email and SMS).</p>
-
-<div class="actions-row">
-  <div></div>
+<!-- ===== PAGE HEADER ===== -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
   <div>
-    <a href="/" class="btn secondary">Back to Dashboard</a>
+    <h1 style="margin: 0; font-size: 28px; font-weight: 700;"><i class="bi bi-bell-fill" style="color: var(--gold); margin-right: 8px;"></i>Notifications</h1>
+    <p style="color: #666; margin-top: 6px; font-size: 14px;">Email and SMS reminder history, scheduled runs, and test messaging</p>
   </div>
+
 </div>
 
-<div class="card" style="margin-bottom: 20px;">
-  <div class="hint" style="margin-bottom: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; font-size: 12px;">
-    Send Test Notification
+<!-- ===== SEND TEST NOTIFICATION CARD ===== -->
+<div class="c-card" style="margin-bottom: 24px;">
+  <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--c-line);">
+    <div class="c-card__icon teal">
+      <i class="bi bi-send"></i>
+    </div>
+    <div>
+      <div class="c-card__title">Send Test Notification</div>
+      <div class="c-card__sub">Verify email and SMS delivery right now</div>
+    </div>
   </div>
-  <p class="hint" style="margin-bottom: 14px;">
-    Enter an email and/or phone number to send a one-off test message right now, and confirm below whether it actually went out.
-  </p>
-  <form method="POST" action="/notifications/test" style="display:grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end;">
-    <div class="form-group" style="margin: 0;">
-      <label>Test Email</label>
-      <input type="email" name="test_email" placeholder="you@example.com">
+
+  <form method="POST" action="/notifications/test" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 14px; align-items: end;">
+    <div>
+      <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.04em;">
+        <i class="bi bi-envelope" style="margin-right: 4px;"></i> Test Email
+      </label>
+      <input type="email" name="test_email" placeholder="you@example.com" style="
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--c-line);
+        border-radius: 6px;
+        font-size: 13px;
+        background: white;
+        color: var(--c-text);
+      ">
     </div>
-    <div class="form-group" style="margin: 0;">
-      <label>Test Phone</label>
-      <input type="text" name="test_phone" placeholder="e.g. 0771234567">
+
+    <div>
+      <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.04em;">
+        <i class="bi bi-telephone" style="margin-right: 4px;"></i> Test Phone
+      </label>
+      <input type="text" name="test_phone" placeholder="e.g. 0771234567" style="
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--c-line);
+        border-radius: 6px;
+        font-size: 13px;
+        background: white;
+        color: var(--c-text);
+      ">
     </div>
-    <button type="submit" class="btn gold" style="height: 38px;">Send Test</button>
+
+    <button type="submit" class="c-btn primary" style="height: 38px;">
+      <i class="bi bi-send"></i> Send Test
+    </button>
   </form>
 
+  <!-- Test Results -->
   <% if (typeof testResults !== 'undefined' && testResults && testResults.length > 0) { %>
-    <div style="margin-top: 18px;">
-      <div class="hint" style="margin-bottom: 8px;">Result</div>
-      <table>
+    <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--c-line);">
+      <div style="font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.04em;">
+        Test Results
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="c-table" style="font-size: 13px;">
+          <thead>
+            <tr>
+              <th>Channel</th>
+              <th>Target</th>
+              <th>Status</th>
+              <th>Detail</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% testResults.forEach(r => { %>
+              <tr>
+                <td>
+                  <% if (r.channel === 'email') { %>
+                    <i class="bi bi-envelope" style="margin-right: 6px; color: #0066cc;"></i> Email
+                  <% } else if (r.channel === 'sms') { %>
+                    <i class="bi bi-chat-dots" style="margin-right: 6px; color: #17a2b8;"></i> SMS
+                  <% } else { %>
+                    <%= r.channel %>
+                  <% } %>
+                </td>
+                <td><code style="font-size: 12px; color: #666;"><%= r.target %></code></td>
+                <td>
+                  <% if (r.status === 'sent') { %>
+                    <span class="c-pill green"><i class="bi bi-check-circle"></i> Sent</span>
+                  <% } else if (r.status === 'failed') { %>
+                    <span class="c-pill red"><i class="bi bi-x-circle"></i> Failed</span>
+                  <% } else { %>
+                    <span class="c-pill grey"><%= r.status %></span>
+                  <% } %>
+                </td>
+                <td style="color: #666; font-size: 12px;">
+                  <% if (r.detail && r.detail.startsWith('http')) { %>
+                    <a href="<%= r.detail %>" target="_blank" rel="noopener" style="color: #0066cc;">View preview →</a>
+                  <% } else { %>
+                    <%= r.detail || '—' %>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% } %>
+</div>
+
+<!-- ===== AUTOMATIC RUN HISTORY ===== -->
+<div class="c-card" style="margin-bottom: 24px;">
+  <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--c-line);">
+    <div class="c-card__icon blue">
+      <i class="bi bi-clock-history"></i>
+    </div>
+    <div>
+      <div class="c-card__title">Automatic Run History</div>
+      <div class="c-card__sub">Scheduled daily at <strong style="color: var(--c-text);">09:00 (Asia/Colombo)</strong></div>
+    </div>
+  </div>
+
+  <p style="font-size: 13px; color: #666; margin-bottom: 16px;">
+    <i class="bi bi-info-circle" style="margin-right: 6px;"></i>
+    A <span class="c-pill amber" style="display: inline-block; padding: 2px 8px;">catch-up</span> badge means the app wasn't running at that exact time (PC off or asleep), so it caught up when it restarted.
+  </p>
+
+  <% if (!runs || runs.length === 0) { %>
+    <div style="padding: 40px; text-align: center; background: #fafafa; border-radius: 8px; border: 1px dashed #ddd; color: #999;">
+      <i class="bi bi-inbox" style="font-size: 32px; margin-bottom: 12px; display: block; opacity: 0.5;"></i>
+      No automatic runs yet — system just started or no reminders were due.
+    </div>
+  <% } else { %>
+    <div style="overflow-x: auto;">
+      <table class="c-table">
         <thead>
           <tr>
-            <th>Channel</th>
-            <th>Target</th>
-            <th>Status</th>
-            <th>Detail</th>
+            <th>Run Date</th>
+            <th>Finished At</th>
+            <th>Trigger</th>
+            <th>Equipment Checked</th>
+            <th>Reminders Sent</th>
+            <th>Email Sent</th>
+            <th>SMS Sent</th>
+            <th>Recipients</th>
           </tr>
         </thead>
         <tbody>
-          <% testResults.forEach(r => { %>
+          <% runs.forEach(run => { %>
             <tr>
-              <td><%= r.channel %></td>
-              <td><%= r.target %></td>
-              <td>
-                <span class="badge <%= r.status.startsWith('sent') ? 'badge-green' : (r.status === 'failed' ? 'badge-red' : 'badge-grey') %>">
-                  <%= r.status %>
-                </span>
+              <td style="font-weight: 600;"><%= run.run_date %></td>
+              <td style="font-size: 13px; color: #666;">
+                <% if (run.finished_at) { %>
+                  <%= run.finished_at %>
+                <% } else { %>
+                  <span style="color: #999; font-style: italic;">(still running)</span>
+                <% } %>
               </td>
               <td>
-                <% if (r.detail && r.detail.startsWith('http')) { %>
-                  <a href="<%= r.detail %>" target="_blank" rel="noopener">View test email preview</a>
+                <% if (run.trigger_type === 'scheduled') { %>
+                  <span class="c-pill green"><i class="bi bi-clock"></i> Automatic</span>
+                <% } else if (run.trigger_type === 'catchup') { %>
+                  <span class="c-pill amber"><i class="bi bi-arrow-repeat"></i> Catch-up</span>
                 <% } else { %>
-                  <%= r.detail || '—' %>
+                  <span class="c-pill grey">Manual</span>
+                <% } %>
+              </td>
+              <td style="text-align: center; font-weight: 600;"><%= run.checked %></td>
+              <td style="text-align: center; font-weight: 600; color: #0066cc;"><%= run.notified %></td>
+              <td style="font-size: 13px;">
+                <span style="color: #28a745; font-weight: 600;"><%= run.email_sent %></span> sent
+                <% if (run.email_failed > 0) { %>
+                  <br><span style="color: #dc3545; font-size: 12px;"><%= run.email_failed %> failed</span>
+                <% } %>
+              </td>
+              <td style="font-size: 13px;">
+                <span style="color: #28a745; font-weight: 600;"><%= run.sms_sent %></span> sent
+                <% if (run.sms_failed > 0) { %>
+                  <br><span style="color: #dc3545; font-size: 12px;"><%= run.sms_failed %> failed</span>
+                <% } %>
+              </td>
+              <td style="font-size: 12px; color: #666;">
+                <% if (run.error) { %>
+                  <span class="c-pill red"><i class="bi bi-exclamation-triangle"></i> Error</span>
+                  <div style="color: #dc3545; margin-top: 4px; font-size: 11px;"><%= run.error %></div>
+                <% } else if (run.recipientList && run.recipientList.length === 0) { %>
+                  <span style="color: #999; font-style: italic;">Nothing due</span>
+                <% } else if (run.recipientList && run.recipientList.length > 0) { %>
+                  <% run.recipientList.forEach((r, idx) => { %>
+                    <div style="margin: 2px 0;">
+                      <strong><%= r.customer %></strong>
+                      <% if (r.renamed) { %>
+                        <span style="color: #999;"> (as <%= r.sentAs %>)</span>
+                      <% } %>
+                    </div>
+                  <% }) %>
                 <% } %>
               </td>
             </tr>
@@ -66,106 +212,250 @@
   <% } %>
 </div>
 
-<h2 style="margin-top:28px;">Automatic Run History</h2>
-<p class="subtitle">
-  Proof that the scheduled job fired. It is set to run daily at
-  <strong><%= dailyRunTime %></strong> (<%= timezone %>).
-  A <span class="badge badge-amber">catch-up</span> row means the app was not running at that
-  exact time (PC off or asleep), so it ran as soon as it started up instead.
-</p>
+<!-- ===== INDIVIDUAL MESSAGES LOG ===== -->
+<div class="c-card">
+  <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--c-line);">
+    <div class="c-card__icon green">
+      <i class="bi bi-chat-left-text"></i>
+    </div>
+    <div>
+      <div class="c-card__title">Individual Messages</div>
+      <div class="c-card__sub">Most recent 200 notification attempts</div>
+    </div>
+  </div>
 
-<% if (!runs || runs.length === 0) { %>
-  <div class="empty-state">No sweeps have run yet.</div>
-<% } else { %>
-<table>
-  <thead>
-    <tr>
-      <th>Run Date</th>
-      <th>Finished At</th>
-      <th>Trigger</th>
-      <th>Checked</th>
-      <th>Reminders Sent</th>
-      <th>Email</th>
-      <th>SMS</th>
-      <th>Recipients</th>
-    </tr>
-  </thead>
-  <tbody>
-    <% runs.forEach(run => { %>
-      <tr>
-        <td><%= run.run_date %></td>
-        <td><%= run.finished_at || '(still running)' %></td>
-        <td>
-          <% if (run.trigger_type === 'scheduled') { %>
-            <span class="badge badge-green">automatic</span>
-          <% } else if (run.trigger_type === 'catchup') { %>
-            <span class="badge badge-amber">catch-up</span>
-          <% } else { %>
-            <span class="badge badge-grey">manual</span>
-          <% } %>
-        </td>
-        <td><%= run.checked %></td>
-        <td><strong><%= run.notified %></strong></td>
-        <td>
-          <%= run.email_sent %> sent<% if (run.email_failed > 0) { %>,
-          <span style="color:var(--red);"><%= run.email_failed %> failed</span><% } %>
-        </td>
-        <td>
-          <%= run.sms_sent %> sent<% if (run.sms_failed > 0) { %>,
-          <span style="color:var(--red);"><%= run.sms_failed %> failed</span><% } %>
-        </td>
-        <td>
-          <% if (run.error) { %>
-            <span class="badge badge-red">error</span> <span class="hint"><%= run.error %></span>
-          <% } else if (run.recipientList.length === 0) { %>
-            <span class="hint">nothing due</span>
-          <% } else { %>
-            <span class="hint"><%= run.recipientList.map(r => r.renamed ? r.customer + ' (sent as ' + r.sentAs + ')' : r.customer).join(', ') %></span>
-          <% } %>
-        </td>
-      </tr>
-    <% }) %>
-  </tbody>
-</table>
-<% } %>
+  <% if (logs.length === 0) { %>
+    <div style="padding: 40px; text-align: center; background: #fafafa; border-radius: 8px; border: 1px dashed #ddd; color: #999;">
+      <i class="bi bi-chat-left-quote" style="font-size: 32px; margin-bottom: 12px; display: block; opacity: 0.5;"></i>
+      No notifications have been sent yet.
+    </div>
+  <% } else { %>
+    <div style="overflow-x: auto;">
+      <table class="c-table">
+        <thead>
+          <tr>
+            <th>Sent At</th>
+            <th>Customer</th>
+            <th>Channel</th>
+            <th>Target</th>
+            <th>Status</th>
+            <th>Detail</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% logs.forEach(l => { %>
+            <tr>
+              <td style="font-size: 13px; color: #666; white-space: nowrap;">
+                <%= l.sent_at %>
+              </td>
+              <td>
+                <strong style="color: var(--c-text);"><%= l.current_customer_name || l.customer_name %></strong>
+                <% if (l.current_customer_name && l.customer_name && l.current_customer_name !== l.customer_name) { %>
+                  <br><span style="font-size: 11px; color: #999;">sent as <%= l.customer_name %></span>
+                <% } %>
+              </td>
+              <td>
+                <% if (l.channel === 'email') { %>
+                  <span class="c-pill blue"><i class="bi bi-envelope"></i> Email</span>
+                <% } else if (l.channel === 'sms') { %>
+                  <span class="c-pill cyan"><i class="bi bi-chat-dots"></i> SMS</span>
+                <% } else { %>
+                  <span class="c-pill grey"><%= l.channel %></span>
+                <% } %>
+              </td>
+              <td style="font-size: 12px; color: #666; font-family: 'Courier New', monospace;">
+                <code><%= l.target || '—' %></code>
+              </td>
+              <td>
+                <% if (l.status === 'sent') { %>
+                  <span class="c-pill green"><i class="bi bi-check-circle"></i> Sent</span>
+                <% } else if (l.status === 'failed') { %>
+                  <span class="c-pill red"><i class="bi bi-x-circle"></i> Failed</span>
+                <% } else { %>
+                  <span class="c-pill grey"><%= l.status %></span>
+                <% } %>
+              </td>
+              <td style="font-size: 12px; color: #666;">
+                <%= l.detail || '—' %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
 
-<h2 style="margin-top:28px;">Individual Messages</h2>
+<!-- ===== STYLES ===== -->
+<style>
+  .c-card {
+    background: white;
+    border: 1px solid var(--c-line);
+    border-radius: 10px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
 
-<% if (logs.length === 0) { %>
-  <div class="empty-state">No notifications have been sent yet.</div>
-<% } else { %>
-<table>
-  <thead>
-    <tr>
-      <th>Sent At</th>
-      <th>Customer</th>
-      <th>Channel</th>
-      <th>Target</th>
-      <th>Status</th>
-      <th>Detail</th>
-    </tr>
-  </thead>
-  <tbody>
-    <% logs.forEach(l => { %>
-      <tr>
-        <td><%= l.sent_at %></td>
-        <td>
-          <%= l.current_customer_name || l.customer_name %>
-          <% if (l.current_customer_name && l.customer_name && l.current_customer_name !== l.customer_name) { %>
-            <br><span class="hint">sent as <%= l.customer_name %></span>
-          <% } %>
-        </td>        <td><%= l.channel %></td>
-        <td><%= l.target || '—' %></td>
-        <td>
-          <span class="badge <%= l.status === 'sent' ? 'badge-green' : (l.status === 'failed' ? 'badge-red' : 'badge-grey') %>">
-            <%= l.status %>
-          </span>
-        </td>
-        <td><%= l.detail || '—' %></td>
-      </tr>
-    <% }) %>
-  </tbody>
-</table>
-<% } %>
+  .c-card__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    font-size: 18px;
+    color: white;
+  }
 
-<%- include('partials/footer') %>
+  .c-card__icon.teal {
+    background: #1AA9BC;
+  }
+
+  .c-card__icon.blue {
+    background: #0066cc;
+  }
+
+  .c-card__icon.green {
+    background: #28a745;
+  }
+
+  .c-card__title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--c-text);
+    margin: 0;
+  }
+
+  .c-card__sub {
+    font-size: 12px;
+    color: var(--c-mute);
+    margin-top: 4px;
+  }
+
+  .c-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
+
+  .c-btn.primary {
+    background: #1AA9BC;
+    color: white;
+  }
+
+  .c-btn.primary:hover {
+    background: #138fa8;
+    transform: translateY(-1px);
+  }
+
+  .c-btn:not(.primary) {
+    background: #f0f0f0;
+    color: #333;
+  }
+
+  .c-btn:not(.primary):hover {
+    background: #e0e0e0;
+  }
+
+  .c-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .c-pill.green {
+    background: #d4edda;
+    color: #155724;
+  }
+
+  .c-pill.red {
+    background: #f8d7da;
+    color: #721c24;
+  }
+
+  .c-pill.blue {
+    background: #d1ecf1;
+    color: #0c5460;
+  }
+
+  .c-pill.cyan {
+    background: #cce5ff;
+    color: #004085;
+  }
+
+  .c-pill.amber {
+    background: #fff3cd;
+    color: #856404;
+  }
+
+  .c-pill.grey {
+    background: #e9ecef;
+    color: #495057;
+  }
+
+  .c-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .c-table thead {
+    background: #f9f9f9;
+    border-bottom: 2px solid var(--c-line);
+  }
+
+  .c-table th {
+    padding: 12px 14px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--c-mute);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .c-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--c-line);
+    color: var(--c-text);
+  }
+
+  .c-table tbody tr:hover {
+    background: #fafafa;
+  }
+
+  .c-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .c-line {
+    background: var(--c-line);
+    height: 1px;
+  }
+
+  .c-mute {
+    color: var(--c-mute);
+  }
+
+  :root {
+    --c-line: #e8ecf1;
+    --c-mute: #7a8a99;
+    --c-text: #1a1a1a;
+    --gold: #D4AF37;
+  }
+</style>
+
+<%- include('partials/console-footer') %>

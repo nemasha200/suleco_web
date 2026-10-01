@@ -1,95 +1,294 @@
-<%- include('../partials/header', { title: 'Calibrations', username, bodyClass: 'calibrations-page' }) %>
+<%- include('../partials/console-header', { 
+  title: 'Services — Technical Tracker',
+  activeNav: 'services',
+  alertCount: typeof alertCount !== 'undefined' ? alertCount : 0,
+  username: typeof username !== 'undefined' ? username : 'admin',
+  q: typeof q !== 'undefined' ? q : ''
+}) %>
 
-<h1>Services</h1>
-<p class="subtitle">
-  All logged calibration records.
-</p>
-
-<% if (typeof flash !== 'undefined' && flash) { %>
-  <div id="flashAlert" class="alert alert-success alert-dismissible fade show d-flex align-items-center gap-2" role="alert">
-    <i class="bi bi-check-circle-fill"></i>
-    <div><%= flash %></div>
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-  </div>
-<% } %>
-
-<div class="actions-row">
-  <div></div>
+<!-- ===== PAGE HEADER ===== -->
+<div class="c-deptbar">
   <div>
-    <a href="/calibrations/new" class="btn gold"><i class="bi bi-plus-lg"></i> Add Calibration</a>
+    <div class="c-deptbar__name">Services</div>
+    <div class="c-deptbar__org">All logged calibration records</div>
   </div>
+  <div class="c-deptbar__date" id="todayDate"></div>
 </div>
 
-<%- include('../partials/searchbar') %>
-
-<% if (calibrations.length === 0) { %>
-  <div class="empty-state">
-    No calibration records yet. <a href="/calibrations/new">Add one</a>.
+<!-- ===== FLASH MESSAGE ===== -->
+<% if (typeof flash !== 'undefined' && flash) { %>
+  <div class="c-auto" id="flashAlert">
+    <i class="bi bi-check-circle-fill" style="color: var(--c-green); font-size: 18px;"></i>
+    <div>
+      <div class="c-auto__headline"><%= flash %></div>
+    </div>
+    <button type="button" onclick="this.parentElement.remove()" style="background:none; border:0; color: var(--c-mute); cursor:pointer; font-size:18px; margin-left:auto;"><i class="bi bi-x"></i></button>
   </div>
-<% } else { %>
-
-<!-- Instant, client-side filter of the table below (separate from the server-side serial-number search above) -->
-<div class="input-group mb-3" style="max-width: 420px;">
-  <span class="input-group-text bg-white"><i class="bi bi-funnel"></i></span>
-  <input type="text" id="quickFilter" class="form-control" placeholder="Quick filter this table…">
-</div>
-
-<table id="calibrationsTable">
-  <thead>
-    <tr>
-      <th data-sort="text">Customer <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th data-sort="text">Equipment Type <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th data-sort="text">Serial No. <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th data-sort="text">Description <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th data-sort="text">Done? <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th data-sort="text">Status <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th data-sort="date">Done Date <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th>Action</th>
-    </tr>
-  </thead>
-  <tbody>
-    <% calibrations.forEach(c => { %>
-      <tr>
-        <td><%= c.customer_name %></td>
-        <td><%= c.equipment_type || '—' %></td>
-        <td><%= c.serial_number || '—' %></td>
-        <td><%= c.description || '—' %></td>
-        <td>
-          <span class="badge <%= c.done === 'Yes' ? 'badge-green' : 'badge-grey' %>">
-            <i class="bi <%= c.done === 'Yes' ? 'bi-check-circle' : 'bi-dash-circle' %>"></i> <%= c.done %>
-          </span>
-        </td>
-        <td><%= c.status || '—' %></td>
-        <td data-sort-value="<%= c.done_date || '' %>"><%= c.done_date || '—' %></td>
-        <td class="text-nowrap">
-          <a href="/calibrations/<%= c.id %>/edit" class="btn small secondary" title="Edit"><i class="bi bi-pencil-square"></i> Edit</a>
-          <form method="POST" action="/calibrations/<%= c.id %>/delete" style="display:inline" onsubmit="return confirm('Delete this calibration record?');">
-            <button type="submit" class="btn small danger" title="Delete"><i class="bi bi-trash"></i> Delete</button>
-          </form>
-        </td>
-      </tr>
-    <% }) %>
-  </tbody>
-</table>
-<div id="noResultsMsg" class="empty-state" style="display:none;">No rows match your filter.</div>
 <% } %>
 
-<script src="/js/table-tools.js"></script>
-<script>
-  // Filter + column sorting + 25-rows-per-page pagination for #calibrationsTable.
-  // All of the logic lives in /public/js/table-tools.js so every list page
-  // behaves the same way.
-  initTableTools('calibrationsTable', { pageSize: 25 });
+<!-- ===== ADD BUTTON ===== -->
+<div class="c-actions" style="margin-bottom: 18px;">
+  <a href="/calibrations/new" class="c-btn primary">
+    <i class="bi bi-plus-lg"></i> Add Calibration
+  </a>
+</div>
 
-  // ---- Auto-dismiss the success flash message after a few seconds ----
-  window.addEventListener('load', () => {
-    const flashAlert = document.getElementById('flashAlert');
-    if (flashAlert && window.bootstrap) {
-      setTimeout(() => {
-        bootstrap.Alert.getOrCreateInstance(flashAlert).close();
-      }, 5000);
+<!-- ===== MAIN CONTENT CARD ===== -->
+<div class="c-card">
+  <!-- Quick filter section -->
+  <% if (calibrations.length > 0) { %>
+    <div style="margin-bottom: 16px;">
+      <div style="position: relative;">
+        <i class="bi bi-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--c-mute); font-size: 14px;"></i>
+        <input type="text" id="quickFilter" placeholder="Quick filter this table…" style="
+          width: 100%;
+          border: 1px solid var(--c-line);
+          border-radius: 9px;
+          padding: 9px 12px 9px 38px;
+          font-size: 13px;
+          color: var(--c-text);
+        ">
+      </div>
+    </div>
+  <% } %>
+
+  <!-- Empty state -->
+  <% if (calibrations.length === 0) { %>
+    <div class="c-empty">
+      No calibration records yet. <a href="/calibrations/new" style="color: var(--c-blue); font-weight: 600;">Add your first one</a>
+    </div>
+  <% } else { %>
+    <!-- Table -->
+    <div style="overflow-x: auto;">
+      <table class="c-table" id="calibrationsTable">
+        <thead>
+          <tr>
+            <th data-sort="text"><i class="bi bi-person"></i> Customer</th>
+            <th data-sort="text"><i class="bi bi-box-seam"></i> Equipment Type</th>
+            <th data-sort="text"><i class="bi bi-barcode"></i> Serial No.</th>
+            <th data-sort="text"><i class="bi bi-file-text"></i> Description</th>
+            <th data-sort="text"><i class="bi bi-check-circle"></i> Done?</th>
+            <th data-sort="text"><i class="bi bi-tag"></i> Status</th>
+            <th data-sort="date"><i class="bi bi-calendar"></i> Done Date</th>
+            <th style="text-align: left;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% calibrations.forEach(c => { %>
+            <tr>
+              <td><strong><%= c.customer_name %></strong></td>
+              <td><%= c.equipment_type || '—' %></td>
+              <td style="font-family: 'Courier New', monospace; font-size: 12px;"><%= c.serial_number || '—' %></td>
+              <td>
+                <%= c.description || '—' %>
+                <% if (c.released_without_service === 'Yes') { %>
+                  <br><span class="c-pill amber" title="Closed at approval — never serviced">Released without service</span>
+                <% } %>
+              </td>
+              <td>
+                <span class="c-pill <%= c.done === 'Yes' ? 'green' : 'grey' %>">
+                  <i class="bi <%= c.done === 'Yes' ? 'bi-check-circle' : 'bi-dash-circle' %>" style="margin-right: 4px;"></i>
+                  <%= c.done %>
+                </span>
+              </td>
+              <td>
+                <% 
+                  let statusColor = 'grey';
+                  if (c.status === 'Survey') statusColor = 'blue';
+                  else if (c.status === 'Lab') statusColor = 'green';
+                  else if (c.status === 'Drones') statusColor = 'amber';
+                %>
+                <span class="c-pill <%= statusColor %>"><%= c.status || '—' %></span>
+              </td>
+              <td data-sort-value="<%= c.done_date || '' %>"><%= c.done_date || '—' %></td>
+              <td style="font-size: 12px;">
+                <a href="/calibrations/<%= c.id %>/edit" class="c-btn" style="padding: 6px 10px; margin-right: 4px;">
+                  <i class="bi bi-pencil-square"></i> Edit
+                </a>
+                <form method="POST" action="/calibrations/<%= c.id %>/delete" style="display:inline;"
+                      data-confirm-delete="This calibration record will be deleted.">
+                  <button type="submit" class="c-btn" style="padding: 6px 10px; margin-right: 4px; color: var(--c-red);">
+                    <i class="bi bi-trash"></i> Delete
+                  </button>
+                </form>
+                <a href="/calibrations/<%= c.id %>/jobcard.pdf" class="c-btn" style="padding: 6px 10px;">
+                  <i class="bi bi-printer"></i> Job Card
+                </a>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+      <div id="pageInfo" style="color: var(--c-mute);"></div>
+      <nav aria-label="Calibration records pages">
+        <ul class="pagination" id="tablePagination" style="margin: 0;"></ul>
+      </nav>
+    </div>
+
+    <div id="noResultsMsg" class="c-empty" style="display:none; margin-top: 12px;">No rows match your filter.</div>
+  <% } %>
+</div>
+
+<%- include('../partials/console-footer') %>
+
+<script>
+  // Set today's date
+  const todayEl = document.getElementById('todayDate');
+  if (todayEl) {
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    todayEl.textContent = today;
+  }
+
+  // Table filter, sort and pagination
+  const PAGE_SIZE = 10;
+  const quickFilter = document.getElementById('quickFilter');
+  const dataTable = document.getElementById('calibrationsTable');
+  const noResultsMsg = document.getElementById('noResultsMsg');
+  const paginationEl = document.getElementById('tablePagination');
+  const pageInfoEl = document.getElementById('pageInfo');
+
+  const tbody = dataTable ? dataTable.querySelector('tbody') : null;
+  const allRows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
+  let filteredRows = allRows.slice();
+  let currentPage = 1;
+  let sortCol = null;
+  let sortAsc = true;
+
+  function updateTable() {
+    const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    allRows.forEach(row => row.style.display = 'none');
+    
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const pageRows = filteredRows.slice(start, start + PAGE_SIZE);
+    pageRows.forEach(row => row.style.display = '');
+    
+    const isEmpty = filteredRows.length === 0;
+    if (dataTable) dataTable.style.display = isEmpty ? 'none' : '';
+    noResultsMsg.style.display = isEmpty ? 'block' : 'none';
+    
+    if (pageInfoEl) {
+      pageInfoEl.textContent = isEmpty
+        ? ''
+        : `Showing ${start + 1}–${start + pageRows.length} of ${filteredRows.length}`;
     }
+
+    updatePagination(totalPages);
+  }
+
+  function updatePagination(totalPages) {
+    paginationEl.innerHTML = '';
+    if (totalPages <= 1) return;
+    
+    for (let i = 1; i <= totalPages; i++) {
+      const li = document.createElement('li');
+      li.className = 'page-item' + (i === currentPage ? ' active' : '');
+      li.innerHTML = `<a class="page-link" href="#" data-page="${i}">${i}</a>`;
+      paginationEl.appendChild(li);
+    }
+    
+    paginationEl.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        currentPage = parseInt(a.dataset.page);
+        updateTable();
+        dataTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+  }
+
+  if (quickFilter) {
+    quickFilter.addEventListener('input', () => {
+      const term = quickFilter.value.toLowerCase();
+      filteredRows = allRows.filter(row => {
+        return row.textContent.toLowerCase().includes(term);
+      });
+      currentPage = 1;
+      updateTable();
+    });
+  }
+
+  // Sort on header click
+  if (dataTable) {
+    dataTable.querySelectorAll('th').forEach((th, idx) => {
+      if (th.dataset.sort) {
+        th.style.cursor = 'pointer';
+        th.addEventListener('click', () => {
+          const sortType = th.dataset.sort;
+          sortAsc = sortCol === idx ? !sortAsc : true;
+          sortCol = idx;
+          
+          filteredRows.sort((a, b) => {
+            const aVal = a.children[idx].dataset.sortValue || a.children[idx].textContent.trim();
+            const bVal = b.children[idx].dataset.sortValue || b.children[idx].textContent.trim();
+            
+            let cmp = 0;
+            if (sortType === 'number') {
+              cmp = parseFloat(aVal) - parseFloat(bVal);
+            } else if (sortType === 'date') {
+              cmp = new Date(aVal) - new Date(bVal);
+            } else {
+              cmp = aVal.localeCompare(bVal);
+            }
+            
+            return sortAsc ? cmp : -cmp;
+          });
+          
+          currentPage = 1;
+          updateTable();
+        });
+      }
+    });
+  }
+
+  // Delete confirmation
+  document.querySelectorAll('form[data-confirm-delete]').forEach(form => {
+    form.addEventListener('submit', (e) => {
+      if (!confirm(form.dataset.confirmDelete)) {
+        e.preventDefault();
+      }
+    });
   });
+
+  // Initial render
+  updateTable();
 </script>
 
-<%- include('../partials/footer') %>
+<style>
+  .pagination {
+    display: flex;
+    gap: 4px;
+    list-style: none;
+    padding: 0;
+  }
+  .page-item .page-link {
+    padding: 4px 8px;
+    border: 1px solid var(--c-line);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--c-text);
+    text-decoration: none;
+  }
+  .page-item .page-link:hover {
+    background: #f0f4f9;
+  }
+  .page-item.active .page-link {
+    background: var(--c-navy);
+    color: #fff;
+    border-color: var(--c-navy);
+  }
+
+  .c-pill.amber {
+    background: #FDF1DC;
+    color: var(--c-amber);
+  }
+  .c-pill.blue {
+    background: #E7EEFC;
+    color: var(--c-blue);
+  }
+</style>

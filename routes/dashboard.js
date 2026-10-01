@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { calibrationBadge, daysUntil } = require('../utils/dates');
 const { runNotificationSweep, DAILY_RUN_TIME, TIMEZONE } = require('../utils/scheduler');
 const { sendEmail, sendSMS, buildEmailMessage, buildSmsMessage } = require('../utils/notify');
+const { listEquipmentWithBadges, finalTotalsByEquipment, equipmentCounts } = require('../utils/equipmentList');
+const stats = require('../utils/dashboardStats');
 
 // The newest automatic (scheduled/catch-up) run the admin hasn't acknowledged
 // yet. This is what powers the "reminders were sent automatically" popup.
@@ -152,22 +153,20 @@ function buildAutomationStatus(lastRun, dailyRunTime, overdueCount, timezone) {
 }
 
 router.get('/', (req, res) => {
-  const rows = db.prepare(`
-    SELECT equipment.*, customers.name AS customer_name, customers.phone AS customer_phone
-    FROM equipment
-    JOIN customers ON customers.id = equipment.customer_id
-    ORDER BY next_calibration_date ASC
-  `).all();
+  // The equipment table itself lives on the Add Equipment page. The dashboard
+  // needs the rows only to count them — it never renders them.
+  // ?dept=Survey|Lab|Drones scopes the page to one department. Anything else
+  // (missing, empty, hand-typed nonsense) falls back to "all departments"
+  // rather than erroring — onlyDivision does that validation.
+  const dept = stats.onlyDivision(req.query.dept);
 
-  const withBadges = rows.map(r => ({
-    ...r,
-    badge: calibrationBadge(r.next_calibration_date),
-    daysLeft: daysUntil(r.next_calibration_date),
-  }));
+  const allEquipment = listEquipmentWithBadges();
+  const equipmentRows = dept ? allEquipment.filter(r => r.company_category === dept) : allEquipment;
+  const { overdueCount, dueSoonCount, totalCount } = equipmentCounts(equipmentRows);
 
-  const overdueCount = withBadges.filter(r => r.daysLeft !== null && r.daysLeft < 0).length;
-  const dueSoonCount = withBadges.filter(r => r.daysLeft !== null && r.daysLeft >= 0 && r.daysLeft <= 7).length;
-  const totalCount = withBadges.length;
+  // "In date" = next calibration still in the future. Drives the progress bar
+  // under the division donut.
+  const inDateCount = equipmentRows.filter(r => r.daysLeft !== null && r.daysLeft >= 0).length;
 
   const flash = req.session.flash || null;
   delete req.session.flash;
@@ -192,10 +191,28 @@ router.get('/', (req, res) => {
   `).get();
 
   res.render('dashboard', {
-    equipment: withBadges,
     overdueCount,
     dueSoonCount,
     totalCount,
+    inDateCount,
+
+    // ---- Panel data. Each of these is one function in utils/dashboardStats.js,
+    // so a panel can be repointed at different data without touching the view.
+    dept,
+    departments: stats.DIVISIONS,
+
+    income: stats.incomeSummary(6, dept),
+    forecast: stats.dueForecast(7, dept),
+    customers: stats.topCustomers(5, dept),
+    notifications: stats.notificationFeed(4, dept),
+    activity: stats.recentActivity(5, dept),
+
+    // These two compare the departments against each other, so they always
+    // show all of them — narrowing them to a single bar or slice would leave
+    // nothing to compare.
+    divisions: stats.divisionCompletion(),
+    divisionMix: stats.equipmentByDivision(),
+    jobsByMonth: stats.jobsByMonthAndDivision(6),
     username: req.session.username,
     flash,
     autoRun,
@@ -208,23 +225,38 @@ router.get('/', (req, res) => {
 
 // Simple CSV export for reporting
 router.get('/export.csv', (req, res) => {
+  // ?category=Survey|Lab|Drones narrows the export to one division — this is
+  // what the Reports card on the dashboard links to. Anything else is ignored
+  // rather than erroring, so a hand-typed URL just gets the full export.
+  const VALID_CATEGORIES = ['Survey', 'Lab', 'Drones'];
+  const category = VALID_CATEGORIES.includes(req.query.category) ? req.query.category : null;
+
   const rows = db.prepare(`
     SELECT customers.name AS customer_name, customers.phone, customers.email,
            equipment.brand, equipment.equipment_type, equipment.serial_number,
-           equipment.last_calibration_date, equipment.next_calibration_date, equipment.status
+           equipment.last_calibration_date, equipment.next_calibration_date, equipment.status,
+           equipment.id AS equipment_id
     FROM equipment
     JOIN customers ON customers.id = equipment.customer_id
+    WHERE (? IS NULL OR equipment.company_category = ?)
     ORDER BY equipment.next_calibration_date ASC
-  `).all();
+  `).all(category, category);
 
-  const header = 'Customer,Phone,Email,Brand,Equipment Type,Serial Number,Last Calibration,Next Calibration,Status\n';
+  // Same final figure the dashboard shows, so the export reconciles with it.
+  const billed = finalTotalsByEquipment();
+
+  const header = 'Customer,Phone,Email,Brand,Equipment Type,Serial Number,Last Calibration,Total Amount,Next Calibration,Status\n';
   const csv = rows.map(r => [
     r.customer_name, r.phone, r.email, r.brand, r.equipment_type, r.serial_number,
-    r.last_calibration_date, r.next_calibration_date, r.status
+    r.last_calibration_date, Number(billed[r.equipment_id] || 0).toFixed(2),
+    r.next_calibration_date, r.status
   ].map(v => `"${(v || '').toString().replace(/"/g, '""')}"`).join(',')).join('\n');
 
   res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', 'attachment; filename="calibration_report.csv"');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="calibration_report${category ? '_' + category.toLowerCase() : ''}.csv"`
+  );
   res.send(header + csv);
 });
 

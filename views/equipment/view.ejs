@@ -1,142 +1,206 @@
-<%- include('../partials/header', { title: 'Equipment Details', username }) %>
+<%- include('../partials/console-header', { 
+  title: 'Equipment Details',
+  activeNav: 'equipment',
+  alertCount: typeof alertCount !== 'undefined' ? alertCount : 0,
+  username: typeof username !== 'undefined' ? username : 'admin'
+}) %>
 
-<div style="margin-bottom: 8px;">
-  <a href="/" class="hint" style="font-size: 13px;">&larr; Back to Dashboard</a>
+<!-- ===== PAGE HEADER ===== -->
+<div style="margin-bottom: 28px;">
+  <h1 style="margin: 0; font-size: 28px; font-weight: 700;">
+    <i class="bi bi-box-seam" style="color: var(--gold); margin-right: 8px;"></i>
+    Equipment Details
+  </h1>
+  <p style="color: #666; margin-top: 6px; font-size: 14px;">
+    <strong><%= equipment.serial_number || 'Equipment' %></strong> — 
+    <%= [equipment.brand, equipment.equipment_type].filter(Boolean).join(' ') %> 
+    for <strong><%= equipment.customer_name || 'Unknown Customer' %></strong>
+  </p>
 </div>
 
-<h1><%= equipment.serial_number || 'Equipment' %></h1>
-<p class="subtitle"><%= equipment.brand || '—' %> <%= equipment.equipment_type || '' %> &middot; <%= equipment.customer_name %></p>
-
-<div class="actions-row">
-  <div></div>
-  <div>
-    <a href="/equipment/<%= equipment.id %>/edit" class="btn secondary">Edit Equipment</a>
-    <form method="POST" action="/equipment/<%= equipment.id %>/mark-done" style="display:inline">
-      <button type="submit" class="btn secondary">Mark Done Today</button>
-    </form>
-    <a href="/calibrations/new" class="btn gold">+ Add Calibration</a>
-  </div>
-</div>
-
-<div class="detail-card">
-  <div class="detail-card-title">Company/Client Deatils</div>
-  <div class="detail-grid">
-    <div>
-      <div class="detail-label">Customer Name/Client Name</div>
-      <div class="detail-value"><%= equipment.customer_name %></div>
-    </div>
-    <div>
-      <div class="detail-label">Company Address</div>
-      <div class="detail-value"><%= equipment.customer_company || '—' %></div>
-    </div>
-    <div>
-      <div class="detail-label">Phone</div>
-      <div class="detail-value"><%= equipment.customer_phone || '—' %></div>
-    </div>
-    <div>
-      <div class="detail-label">Email</div>
-      <div class="detail-value"><%= equipment.customer_email || '—' %></div>
-    </div>
-  </div>
-</div>
-
-<div class="detail-card">
-  <div class="detail-card-title">Equipment Details</div>
-  <div class="detail-grid">
-    <div>
-      <div class="detail-label">Equipment Type</div>
-      <div class="detail-value"><%= equipment.equipment_type || '—' %></div>
-    </div>
-    <div>
-      <div class="detail-label">Brand</div>
-      <div class="detail-value"><%= equipment.brand || '—' %></div>
-    </div>
-    <div>
-      <div class="detail-label">Model</div>
-      <div class="detail-value"><%= equipment.model || '—' %></div>
-    </div>
-    <div>
-      <div class="detail-label">Serial Number</div>
-      <div class="detail-value"><%= equipment.serial_number || '—' %></div>
-    </div>
-    <div>
-      <div class="detail-label">Status</div>
-      <div class="detail-value">
-        <span class="badge badge-grey"><%= equipment.status || '—' %></span>
-      </div>
-    </div>
-    <div>
-      <div class="detail-label">Last Calibration</div>
-      <div class="detail-value"><%= equipment.last_calibration_date || '—' %></div>
-    </div>
-    <div>
-      <div class="detail-label">Next Calibration</div>
-      <div class="detail-value"><%= equipment.next_calibration_date || '—' %></div>
-    </div>
-    <div>
-      <div class="detail-label">Sold By Us</div>
-      <div class="detail-value"><%= equipment.sold_by_us || '—' %></div>
-    </div>
-    <% if (equipment.sold_by_us === 'Yes') { %>
-      <div>
-        <div class="detail-label">Purchase Date</div>
-        <div class="detail-value"><%= equipment.purchase_date || '—' %></div>
-      </div>
-      <div>
-        <div class="detail-label">Warranty Period</div>
-        <div class="detail-value"><%= equipment.warranty_period_months ? equipment.warranty_period_months + ' months' : '—' %></div>
-      </div>
-    <% } %>
-  </div>
-</div>
-
-<div class="detail-card">
-  <div class="detail-card-title">Calibration History</div>
-
-  <% if (calibrations.length === 0) { %>
-    <div class="empty-state">No calibration records logged for this equipment yet.</div>
-  <% } else { %>
-    <table>
-      <thead>
-        <tr>
-          <th>Description</th>
-          <th>Done?</th>
-          <th>Status</th>
-          <th>Done Date</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        <% calibrations.forEach(c => { %>
-          <tr>
-            <td><%= c.description || '—' %></td>
-            <td><%= c.done %></td>
-            <td><%= c.status || '—' %></td>
-            <td><%= c.done_date || '—' %></td>
-            <td class="text-nowrap">
-              <a href="/calibrations/<%= c.id %>/edit" class="btn small secondary">Edit</a>
-              <!-- Opens the QR panel for this instrument. Every row shows the
-                   same code on purpose — the QR identifies the equipment, not
-                   an individual service record. -->
-              <% if (qrImage) { %>
-                <button type="button" class="btn small qr" onclick="openQrModal()" title="QR code for <%= equipment.serial_number %>">
-                  <i class="bi bi-qr-code"></i> QR
-                </button>
-              <% } %>
-            </td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
+<!-- ===== ACTION BUTTONS ===== -->
+<div style="display: flex; gap: 12px; margin-bottom: 24px;">
+  <a href="/equipment/<%= equipment.id %>/edit" class="c-btn primary">
+    <i class="bi bi-pencil-square"></i> Edit Equipment
+  </a>
+  <a href="/calibrations/new?equipment_id=<%= equipment.id %>" class="c-btn primary">
+    <i class="bi bi-plus-lg"></i> Add Calibration
+  </a>
+  <a href="/equipment" class="c-btn secondary">
+    <i class="bi bi-arrow-left"></i> Back to Equipment
+  </a>
+  <% if (typeof qrImage !== 'undefined' && qrImage) { %>
+    <button type="button" class="c-btn secondary" onclick="openQrModal()">
+      <i class="bi bi-qr-code"></i> QR Code
+    </button>
   <% } %>
 </div>
 
-<!-- QR panel, hidden until a QR button in the history table is clicked. -->
-<% if (qrImage) { %>
+<div style="max-width: 1000px; margin: 0 auto;">
+
+  <!-- ===== CUSTOMER DETAILS CARD ===== -->
+  <div class="c-card">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--c-line);">
+      <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px; background: #1AA9BC; color: white; font-size: 18px;">
+        <i class="bi bi-person-vcard"></i>
+      </div>
+      <div>
+        <div style="font-size: 15px; font-weight: 700; color: var(--c-text); margin: 0;">Customer Details</div>
+        <div style="font-size: 12px; color: var(--c-mute); margin-top: 2px;">Client information</div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px;">
+      <div>
+        <div style="font-size: 11px; color: var(--c-mute); text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 6px;">Customer Name</div>
+        <div style="font-size: 14px; font-weight: 600; color: var(--c-text);"><%= equipment.customer_name || '—' %></div>
+      </div>
+      <div>
+        <div style="font-size: 11px; color: var(--c-mute); text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 6px;">Company Address</div>
+        <div style="font-size: 14px; font-weight: 600; color: var(--c-text);"><%= equipment.customer_company || '—' %></div>
+      </div>
+      <div>
+        <div style="font-size: 11px; color: var(--c-mute); text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 6px;">Phone</div>
+        <div style="font-size: 14px; font-weight: 600; color: var(--c-text);"><%= equipment.customer_phone || '—' %></div>
+      </div>
+      <div>
+        <div style="font-size: 11px; color: var(--c-mute); text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 6px;">Email</div>
+        <div style="font-size: 14px; font-weight: 600; color: var(--c-text); word-break: break-all;"><%= equipment.customer_email || '—' %></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== EQUIPMENT DETAILS CARD ===== -->
+  <div class="c-card">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--c-line);">
+      <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px; background: #0066cc; color: white; font-size: 18px;">
+        <i class="bi bi-box-seam"></i>
+      </div>
+      <div>
+        <div style="font-size: 15px; font-weight: 700; color: var(--c-text); margin: 0;">Equipment Details</div>
+        <div style="font-size: 12px; color: var(--c-mute); margin-top: 2px;">Instrument specifications</div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px;">
+      <div>
+        <div style="font-size: 11px; color: var(--c-mute); text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 6px;">Equipment Type</div>
+        <div style="font-size: 14px; font-weight: 600; color: var(--c-text);"><%= equipment.equipment_type || '—' %></div>
+      </div>
+      <div>
+        <div style="font-size: 11px; color: var(--c-mute); text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 6px;">Brand</div>
+        <div style="font-size: 14px; font-weight: 600; color: var(--c-text);"><%= equipment.brand || '—' %></div>
+      </div>
+      <div>
+        <div style="font-size: 11px; color: var(--c-mute); text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 6px;">Model</div>
+        <div style="font-size: 14px; font-weight: 600; color: var(--c-text);"><%= equipment.model || '—' %></div>
+      </div>
+      <div>
+        <div style="font-size: 11px; color: var(--c-mute); text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 6px;">Serial Number</div>
+        <div style="font-size: 14px; font-weight: 600; color: var(--c-text); font-family: 'Courier New', monospace;"><%= equipment.serial_number || '—' %></div>
+      </div>
+      <div>
+        <div style="font-size: 11px; color: var(--c-mute); text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 6px;">Status</div>
+        <div>
+          <span class="c-badge" style="background: #f0f0f0; color: #666; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 12px;"><%= equipment.status || 'Active' %></span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size: 11px; color: var(--c-mute); text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 6px;">Sold By Us</div>
+        <div style="font-size: 14px; font-weight: 600; color: var(--c-text);"><%= equipment.sold_by_us || 'No' %></div>
+      </div>
+      <div>
+        <div style="font-size: 11px; color: var(--c-mute); text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 6px;">Last Calibration</div>
+        <div style="font-size: 14px; font-weight: 600; color: var(--c-text);"><%= equipment.last_calibration_date || '—' %></div>
+      </div>
+      <div>
+        <div style="font-size: 11px; color: var(--c-mute); text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 6px;">Next Calibration</div>
+        <div style="font-size: 14px; font-weight: 600; color: var(--c-text);"><%= equipment.next_calibration_date || '—' %></div>
+      </div>
+
+      <% if (equipment.sold_by_us === 'Yes') { %>
+        <div>
+          <div style="font-size: 11px; color: var(--c-mute); text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 6px;">Purchase Date</div>
+          <div style="font-size: 14px; font-weight: 600; color: var(--c-text);"><%= equipment.purchase_date || '—' %></div>
+        </div>
+        <div>
+          <div style="font-size: 11px; color: var(--c-mute); text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 6px;">Warranty Period</div>
+          <div style="font-size: 14px; font-weight: 600; color: var(--c-text);"><%= equipment.warranty_period_months ? equipment.warranty_period_months + ' months' : '—' %></div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- ===== CALIBRATION HISTORY CARD ===== -->
+  <div class="c-card">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--c-line);">
+      <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px; background: #28a745; color: white; font-size: 18px;">
+        <i class="bi bi-clipboard-check"></i>
+      </div>
+      <div>
+        <div style="font-size: 15px; font-weight: 700; color: var(--c-text); margin: 0;">Calibration History</div>
+        <% if (typeof calibrations !== 'undefined' && calibrations && calibrations.length > 0) { %>
+          <div style="font-size: 12px; color: var(--c-mute); margin-top: 2px;"><%= calibrations.length %> record<%= calibrations.length !== 1 ? 's' : '' %></div>
+        <% } else { %>
+          <div style="font-size: 12px; color: var(--c-mute); margin-top: 2px;">No records yet</div>
+        <% } %>
+      </div>
+    </div>
+
+    <% if (typeof calibrations === 'undefined' || !calibrations || calibrations.length === 0) { %>
+      <div style="text-align: center; padding: 32px 20px;">
+        <i class="bi bi-inbox" style="font-size: 32px; color: var(--c-mute); display: block; margin-bottom: 12px;"></i>
+        <div style="font-size: 14px; color: var(--c-text); font-weight: 500; margin-bottom: 4px;">No calibration records yet</div>
+        <div style="font-size: 13px; color: var(--c-mute); margin-bottom: 16px;">Start tracking service history for this equipment</div>
+        <a href="/calibrations/new?equipment_id=<%= equipment.id %>" class="c-btn primary">
+          <i class="bi bi-plus-lg"></i> Add First Calibration
+        </a>
+      </div>
+    <% } else { %>
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--c-line); background: #f9fafb;">
+              <th style="padding: 12px; text-align: left; font-weight: 600; color: var(--c-mute); text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em;">Description</th>
+              <th style="padding: 12px; text-align: left; font-weight: 600; color: var(--c-mute); text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em;">Completed</th>
+              <th style="padding: 12px; text-align: left; font-weight: 600; color: var(--c-mute); text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em;">Status</th>
+              <th style="padding: 12px; text-align: left; font-weight: 600; color: var(--c-mute); text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em;">Done Date</th>
+              <th style="padding: 12px; text-align: left; font-weight: 600; color: var(--c-mute); text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% calibrations.forEach(c => { %>
+              <tr style="border-bottom: 1px solid var(--c-line); color: var(--c-text);">
+                <td style="padding: 14px 12px; font-weight: 500;"><%= c.description || '—' %></td>
+                <td style="padding: 14px 12px;">
+                  <span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 11px; background: <% if (c.done === 'Yes') { %>#dcfce7; color: #166534<% } else { %>#f0f0f0; color: #666<% } %>;">
+                    <% if (c.done === 'Yes') { %><i class="bi bi-check-circle-fill"></i><% } %>
+                    <%= c.done || 'No' %>
+                  </span>
+                </td>
+                <td style="padding: 14px 12px;"><%= c.status || '—' %></td>
+                <td style="padding: 14px 12px;"><%= c.done_date || '—' %></td>
+                <td style="padding: 14px 12px;">
+                  <a href="/calibrations/<%= c.id %>/edit" class="c-btn" style="display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; background: #f0f0f0; color: #333; border: none; border-radius: 6px; text-decoration: none; font-size: 12px; cursor: pointer; transition: all 0.2s;">
+                    <i class="bi bi-pencil-square"></i> Edit
+                  </a>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+
+</div>
+
+<!-- ===== QR CODE MODAL ===== -->
+<% if (typeof qrImage !== 'undefined' && qrImage) { %>
   <div class="qr-modal-overlay" id="qrModal" onclick="if (event.target === this) closeQrModal()">
     <div class="qr-modal" role="dialog" aria-modal="true" aria-label="QR code">
       <div class="qr-modal-head">
-        <div class="detail-card-title" style="margin:0;">QR Code</div>
+        <div style="font-weight: 700; font-size: 15px;">QR Code — <%= equipment.serial_number || 'Equipment' %></div>
         <button type="button" class="qr-modal-close" onclick="closeQrModal()" aria-label="Close">
           <i class="bi bi-x-lg"></i>
         </button>
@@ -144,92 +208,245 @@
 
       <div class="qr-block">
         <div class="qr-preview">
-          <img src="<%= qrImage %>" alt="QR code for <%= equipment.serial_number %>">
+          <img src="<%= qrImage %>" alt="QR code" style="width: 240px; height: 240px; border: 1px solid var(--c-line); border-radius: 8px;">
           <div class="qr-caption"><%= equipment.serial_number || 'Equipment' %></div>
         </div>
         <div class="qr-info">
-          <p class="qr-text">
-            Print this code and stick it on the instrument. Scanning it with any phone
-            camera opens a read-only page with the full equipment details and every
-            calibration record logged against it — no login needed.
+          <p style="font-size: 13px; color: var(--c-text); margin-bottom: 16px;">
+            Print this code and stick it on the instrument. Scanning it with any phone camera opens a read-only page with equipment details and service history — no login needed.
           </p>
-          <div class="qr-url-row">
-            <input type="text" id="qrScanUrl" class="qr-url" value="<%= scanUrl %>" readonly>
-            <button type="button" class="btn small secondary" onclick="copyScanUrl()">
-              <i class="bi bi-clipboard"></i> Copy
-            </button>
+
+          <div style="margin-bottom: 16px;">
+            <label style="font-size: 12px; color: var(--c-mute); text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 6px;">Scan Link</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="qrScanUrl" value="<%= typeof scanUrl !== 'undefined' ? scanUrl : '' %>" readonly style="
+                flex: 1;
+                border: 1px solid var(--c-line);
+                border-radius: 8px;
+                padding: 8px 10px;
+                font-size: 12px;
+                font-family: 'Courier New', monospace;
+                color: var(--c-text);
+              ">
+              <button type="button" class="c-btn secondary" onclick="copyScanUrl()" style="padding: 6px 12px;">
+                <i class="bi bi-clipboard"></i> Copy
+              </button>
+            </div>
           </div>
-          <div class="qr-actions">
-            <a href="/equipment/<%= equipment.id %>/qr.png" class="btn small gold" download>
+
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <a href="/equipment/<%= equipment.id %>/qr.png" class="c-btn primary" download style="flex: 1; text-align: center; text-decoration: none;">
               <i class="bi bi-download"></i> Download QR
             </a>
-            <button type="button" class="btn small secondary" onclick="printQr()">
-              <i class="bi bi-printer"></i> Print Sticker
+            <button type="button" class="c-btn secondary" onclick="printQr()" style="flex: 1;">
+              <i class="bi bi-printer"></i> Print
             </button>
-            <a href="<%= scanUrl %>" target="_blank" rel="noopener" class="btn small secondary">
-              <i class="bi bi-box-arrow-up-right"></i> Preview Scan Page
+            <a href="<%= typeof scanUrl !== 'undefined' ? scanUrl : '#' %>" target="_blank" rel="noopener" class="c-btn secondary" style="flex: 1; text-decoration: none;">
+              <i class="bi bi-box-arrow-up-right"></i> Preview
             </a>
           </div>
-          <p class="hint qr-hint">
-            Phones must be on the same network as this server for the link to open.
-            If the address above says <code>localhost</code>, set <code>PUBLIC_BASE_URL</code> in your <code>.env</code>.
-          </p>
+
+          <div style="background: #F0F4F9; border: 1px solid var(--c-line); border-radius: 8px; padding: 10px 12px; font-size: 12px; color: var(--c-mute);">
+            <i class="bi bi-info-circle" style="margin-right: 6px;"></i>
+            Phones must be on the same network. If address says <code>localhost</code>, set <code>PUBLIC_BASE_URL</code> in <code>.env</code>.
+          </div>
         </div>
       </div>
     </div>
   </div>
 <% } %>
 
+<!-- ===== STYLES ===== -->
+<style>
+  .c-card {
+    background: white;
+    border: 1px solid var(--c-line);
+    border-radius: 10px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    margin-bottom: 24px;
+  }
+
+  .c-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
+
+  .c-btn.primary {
+    background: #1AA9BC;
+    color: white;
+  }
+
+  .c-btn.primary:hover {
+    background: #138fa8;
+    transform: translateY(-1px);
+  }
+
+  .c-btn.secondary {
+    background: #f0f0f0;
+    color: #333;
+  }
+
+  .c-btn.secondary:hover {
+    background: #e0e0e0;
+  }
+
+  .c-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .qr-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s, visibility 0.2s;
+  }
+
+  .qr-modal-overlay.is-open {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .qr-modal {
+    background: #fff;
+    border-radius: 14px;
+    width: 90%;
+    max-width: 480px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.32);
+  }
+
+  .qr-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    border-bottom: 1px solid var(--c-line);
+  }
+
+  .qr-modal-close {
+    background: none;
+    border: 0;
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--c-mute);
+  }
+
+  .qr-modal-close:hover {
+    color: var(--c-text);
+  }
+
+  .qr-block {
+    padding: 20px;
+    display: flex;
+    gap: 20px;
+    flex-direction: column;
+  }
+
+  .qr-preview {
+    text-align: center;
+  }
+
+  .qr-caption {
+    margin-top: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--c-text);
+    font-family: 'Courier New', monospace;
+  }
+
+  .qr-info {
+    flex: 1;
+  }
+
+  :root {
+    --c-line: #e8ecf1;
+    --c-mute: #7a8a99;
+    --c-text: #1a1a1a;
+    --gold: #D4AF37;
+  }
+
+  @media (max-width: 640px) {
+    .qr-block {
+      flex-direction: column;
+    }
+  }
+</style>
+
+<!-- ===== SCRIPTS ===== -->
 <script>
+  // QR Modal functions
   function openQrModal() {
-    document.getElementById('qrModal').classList.add('is-open');
+    const modal = document.getElementById('qrModal');
+    if (modal) modal.classList.add('is-open');
   }
 
   function closeQrModal() {
-    document.getElementById('qrModal').classList.remove('is-open');
+    const modal = document.getElementById('qrModal');
+    if (modal) modal.classList.remove('is-open');
   }
 
-  // Esc closes the panel, matching what people expect from a dialog.
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeQrModal();
   });
 
   function copyScanUrl() {
     const field = document.getElementById('qrScanUrl');
+    if (!field) return;
     field.select();
-    field.setSelectionRange(0, 99999); // iOS needs the explicit range
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(field.value);
+      navigator.clipboard.writeText(field.value).catch(() => {
+        document.execCommand('copy');
+      });
     } else {
       document.execCommand('copy');
     }
   }
 
-  // Opens just the QR + serial number in a small window and sends it to the
-  // printer, so you get a clean sticker instead of the whole page.
   function printQr() {
     const serial = <%- JSON.stringify(equipment.serial_number || 'Equipment') %>;
     const brand = <%- JSON.stringify([equipment.brand, equipment.model].filter(Boolean).join(' ')) %>;
     const img = <%- JSON.stringify(qrImage || '') %>;
 
+    if (!img) return;
+
     const win = window.open('', '_blank', 'width=420,height=560');
     win.document.write(`
+      <!DOCTYPE html>
       <html>
         <head>
           <title>QR — ${serial}</title>
           <style>
-            body { font-family: Arial, sans-serif; text-align: center; padding: 24px; margin: 0; }
+            body { font-family: Arial, sans-serif; text-align: center; padding: 24px; margin: 0; background: #fff; }
             img { width: 260px; height: 260px; }
-            .serial { font-size: 20px; font-weight: 700; margin-top: 10px; }
-            .brand { font-size: 13px; color: #555; }
-            .co { font-size: 11px; color: #777; margin-top: 12px; letter-spacing: 1px; }
+            .serial { font-size: 18px; font-weight: 700; margin-top: 12px; color: #0B2545; }
+            .brand { font-size: 13px; color: #6B7A90; margin-top: 6px; }
+            .co { font-size: 11px; color: #8FA6C2; margin-top: 14px; letter-spacing: 1px; text-transform: uppercase; }
           </style>
         </head>
         <body>
           <img src="${img}" alt="QR">
           <div class="serial">${serial}</div>
           <div class="brand">${brand}</div>
-          <div class="co">SULECO (PVT) LTD &middot; SCAN FOR SERVICE HISTORY</div>
+          <div class="co">SULECO (PVT) LTD • SCAN FOR SERVICE HISTORY</div>
         </body>
       </html>
     `);
@@ -239,4 +456,4 @@
   }
 </script>
 
-<%- include('../partials/footer') %>
+<%- include('../partials/console-footer') %>

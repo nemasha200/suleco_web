@@ -1,0 +1,736 @@
+<%- include('../partials/console-header', { 
+  title: 'Service Workflow', 
+  activeNav: 'services', 
+  alertCount: typeof alertCount !== 'undefined' ? alertCount : 0,
+  username: typeof username !== 'undefined' ? username : 'admin'
+}) %>
+
+<% const stage = calibration.stage || 'done'; %>
+
+<!-- ===== PAGE HEADER ===== -->
+<div style="margin-bottom: 28px;">
+  <h1 style="margin: 0; font-size: 28px; font-weight: 700;"><i class="bi bi-gear-wide-connected" style="color: var(--gold); margin-right: 8px;"></i>Service Workflow</h1>
+  <p style="color: #666; margin-top: 6px; font-size: 14px;">
+    <strong><%= calibration.serial_number || 'No serial' %></strong> — 
+    <%= [calibration.brand, calibration.equipment_type].filter(Boolean).join(' ') %>
+    for <strong><%= calibration.customer_name %></strong>
+  </p>
+</div>
+
+<!-- ===== FLASH MESSAGE ===== -->
+<% if (typeof flash !== 'undefined' && flash) { %>
+  <div class="alert alert-success" style="margin-bottom: 20px; display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: #d4edda; border: 1px solid #a9d4e3; border-radius: 8px; color: #155724;">
+    <i class="bi bi-check-circle-fill" style="font-size: 18px;"></i>
+    <span style="font-weight: 600;"><%= flash %></span>
+  </div>
+<% } %>
+
+<!-- ===== GROUP 1 — CHECK IN (Read-Only) ===== -->
+<div class="c-card">
+  <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--c-line);">
+    <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px; background: #28a745; color: white; font-size: 18px;">
+      <i class="bi bi-check-circle-fill"></i>
+    </div>
+    <div>
+      <div style="font-size: 15px; font-weight: 700; color: var(--c-text); margin: 0;">Group 1 — Check In</div>
+      <div style="font-size: 12px; color: var(--c-mute); margin-top: 2px;">Equipment logged in</div>
+    </div>
+    <span class="badge" style="margin-left: auto; background: #dcfce7; color: #166534; padding: 6px 14px; border-radius: 12px; font-weight: 600; font-size: 11px;">Complete</span>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px 28px; padding: 0;">
+    <div>
+      <div class="hint" style="margin-bottom: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">Serial Number</div>
+      <div style="font-weight: 600; font-size: 14px; color: var(--c-text);"><%= calibration.serial_number || '—' %></div>
+    </div>
+    <div>
+      <div class="hint" style="margin-bottom: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">Check In Date</div>
+      <div style="font-weight: 600; font-size: 14px; color: var(--c-text);"><%= calibration.check_in_date || '—' %></div>
+    </div>
+    <div>
+      <div class="hint" style="margin-bottom: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">Service Description</div>
+      <div style="font-weight: 600; font-size: 14px; color: var(--c-text);"><%= calibration.description || '—' %></div>
+    </div>
+    <div>
+      <div class="hint" style="margin-bottom: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">Customer</div>
+      <div style="font-weight: 600; font-size: 14px; color: var(--c-text);"><%= calibration.customer_name %></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== GROUP 2 — APPROVAL ===== -->
+<div class="c-card">
+  <% if (stage === 'approval') { %>
+    <!-- APPROVAL IN PROGRESS -->
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--c-line);">
+      <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px; background: #0066cc; color: white; font-size: 18px;">
+        <i class="bi bi-clipboard-check"></i>
+      </div>
+      <div>
+        <div style="font-size: 15px; font-weight: 700; color: var(--c-text); margin: 0;">Group 2 — Approval</div>
+        <div style="font-size: 12px; color: var(--c-mute); margin-top: 2px;">Tick boxes and save progress</div>
+      </div>
+      <span class="badge" style="margin-left: auto; background: #fef3c7; color: #92400e; padding: 6px 14px; border-radius: 12px; font-weight: 600; font-size: 11px;">Step 2 of 3</span>
+    </div>
+
+    <p style="font-size: 13px; color: #666; margin-bottom: 18px; padding: 12px; background: #f9fafb; border-left: 3px solid #0066cc; border-radius: 4px;">
+      <strong>Tick whichever applies, then Save.</strong> None of these is required, and they can be ticked on different days.
+    </p>
+
+    <form method="POST" action="/calibrations/<%= calibration.id %>/approval">
+      <%
+        const rows = [
+          { name: "equipment_return", label: "Equipment Return After the Inspection",
+            on: calibration.equipment_return === "Yes", date: calibration.equipment_return_date },
+          { name: "quotation_sent", label: "Quotation Sent",
+            on: calibration.quotation_sent === "Yes", date: calibration.quotation_sent_date },
+          { name: "po_received", label: "PO Received",
+            on: calibration.po_received === "Yes", date: calibration.po_received_date },
+        ];
+      %>
+
+      <div style="margin-bottom: 18px;">
+        <% rows.forEach((row, i) => { %>
+          <div style="display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--c-line);">
+            <span style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: #f0f0f0; border-radius: 4px; font-weight: 600; color: #666; font-size: 12px;"><%= i + 1 %></span>
+            <label style="display: flex; align-items: center; gap: 10px; margin: 0; flex: 1; cursor: pointer;">
+              <input type="checkbox" name="<%= row.name %>" value="Yes" <% if (row.on) { %>checked<% } %>
+                     data-approval-box data-date-slot="date-<%= row.name %>"
+                     style="width: 18px; height: 18px; cursor: pointer;">
+              <span style="font-size: 13px; color: var(--c-text); font-weight: 500;"><%= row.label %></span>
+            </label>
+            <span id="date-<%= row.name %>" style="min-width: 140px; text-align: right;" data-saved-date="<%= row.date || '' %>">
+              <% if (row.date) { %>
+                <span class="badge" style="background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 10px;"><i class="bi bi-calendar-check"></i> <%= row.date %></span>
+              <% } else { %>
+                <span style="font-size: 12px; color: var(--c-mute);">—</span>
+              <% } %>
+            </span>
+          </div>
+        <% }) %>
+      </div>
+
+      <!-- Release Without Service Toggle -->
+      <div style="background: #fef3c7; border: 1px solid #f0dfae; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: #fff; border-radius: 4px; font-weight: 600; color: #92400e; font-size: 12px; border: 1px solid #f0dfae;">4</span>
+          <label style="display: flex; align-items: center; gap: 10px; margin: 0; flex: 1; cursor: pointer;">
+            <input type="checkbox" id="releaseToggle" name="released_without_service" value="Yes"
+                   style="width: 18px; height: 18px; cursor: pointer;">
+            <span style="font-size: 13px; color: var(--c-text); font-weight: 500;">Equipment Release Without Service</span>
+          </label>
+          <span id="releaseDate" style="min-width: 140px; text-align: right;">
+            <span style="font-size: 12px; color: var(--c-mute);">—</span>
+          </span>
+        </div>
+        <div id="releaseHint" style="display: none; margin: 10px 0 0 36px; font-size: 12px; color: #92400e; font-weight: 500;">
+          Save &amp; Exit closes this job today. It stays in Services, but drops out of Jobs in progress.
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <div style="display: flex; gap: 12px; padding-top: 12px; border-top: 1px solid var(--c-line);">
+        <button type="submit" name="action" value="save" class="c-btn secondary" id="saveBtn">
+          <i class="bi bi-save"></i> Save
+        </button>
+        <button type="submit" name="action" value="start" class="c-btn primary" id="startServiceBtn">
+          <i class="bi bi-play-fill"></i> Start Service
+        </button>
+        <button type="submit" name="action" value="release" class="c-btn warning" id="saveExitBtn" style="display: none;">
+          <i class="bi bi-box-arrow-right"></i> Save &amp; Exit
+        </button>
+        <a href="/calibrations/new" class="c-btn secondary" style="text-decoration: none;">
+          <i class="bi bi-arrow-left"></i> Back
+        </a>
+      </div>
+
+      <% if (calibration.approval_updated_at) { %>
+        <div class="hint" style="margin-top: 12px; font-size: 12px;">
+          <i class="bi bi-clock-history"></i> Last saved <%= calibration.approval_updated_at %>
+        </div>
+      <% } %>
+    </form>
+
+  <% } else { %>
+    <!-- APPROVAL COMPLETE -->
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--c-line);">
+      <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px; background: #28a745; color: white; font-size: 18px;">
+        <i class="bi bi-check-circle-fill"></i>
+      </div>
+      <div>
+        <div style="font-size: 15px; font-weight: 700; color: var(--c-text); margin: 0;">Group 2 — Approval</div>
+        <div style="font-size: 12px; color: var(--c-mute); margin-top: 2px;">Approval completed</div>
+      </div>
+      <span class="badge" style="margin-left: auto; background: #dcfce7; color: #166534; padding: 6px 14px; border-radius: 12px; font-weight: 600; font-size: 11px;">Complete</span>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+      <%
+        const done = [
+          ["Equipment Return", calibration.equipment_return === "Yes", calibration.equipment_return_date],
+          ["Quotation Sent", calibration.quotation_sent === "Yes", calibration.quotation_sent_date],
+          ["PO Received", calibration.po_received === "Yes", calibration.po_received_date],
+        ];
+      %>
+      <% done.forEach(([label, ticked, date]) => { %>
+        <span class="badge" style="background: <% if (ticked) { %>#dcfce7<% } else { %>#e9ecef<% } %>; color: <% if (ticked) { %>#166534<% } else { %>#495057<% } %>; padding: 6px 12px; border-radius: 12px; font-weight: 600; font-size: 11px;">
+          <% if (ticked) { %>✓<% } else { %>—<% } %> <%= label %><% if (date) { %> · <%= date %><% } %>
+        </span>
+      <% }) %>
+    </div>
+
+    <% if (calibration.released_without_service === "Yes") { %>
+      <div style="margin-top: 14px; padding: 12px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 4px;">
+        <strong style="color: #92400e;">Equipment released without service</strong> on <%= calibration.released_date %>.
+        This job was closed at approval and never went through Group 3.
+      </div>
+    <% } %>
+
+    <% if (calibration.approved_at) { %>
+      <div class="hint" style="margin-top: 12px; font-size: 12px;">
+        <i class="bi bi-check-lg"></i> Service started <%= calibration.approved_at %>
+      </div>
+    <% } %>
+  <% } %>
+</div>
+
+<!-- ===== GROUP 3 — SERVICE ===== -->
+<% if (calibration.released_without_service === 'Yes') { %>
+  <!-- Released without service: no Group 3 form -->
+  <div class="c-card">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--c-line);">
+      <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px; background: #f0f0f0; color: #666; font-size: 18px;">
+        <i class="bi bi-skip-forward"></i>
+      </div>
+      <div>
+        <div style="font-size: 15px; font-weight: 700; color: var(--c-text); margin: 0;">Group 3 — Service</div>
+        <div style="font-size: 12px; color: var(--c-mute); margin-top: 2px;">Skipped</div>
+      </div>
+      <span class="badge" style="margin-left: auto; background: #e9ecef; color: #495057; padding: 6px 14px; border-radius: 12px; font-weight: 600; font-size: 11px;">Not Required</span>
+    </div>
+    <p class="hint" style="margin: 0; font-size: 12px;">
+      The equipment was released without service on <%= calibration.released_date %>, so this stage was skipped.
+    </p>
+    <div style="display: flex; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--c-line);">
+      <a href="/calibrations" class="c-btn secondary" style="text-decoration: none;"><i class="bi bi-list-ul"></i> All Records</a>
+      <a href="/calibrations/<%= calibration.id %>/jobcard.pdf" class="c-btn secondary" style="text-decoration: none;"><i class="bi bi-printer"></i> Job Card</a>
+    </div>
+  </div>
+
+<% } else if (stage === 'approval') { %>
+  <!-- Locked: service begins only after starting approval -->
+  <div class="c-card" style="opacity: 0.6;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--c-line);">
+      <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px; background: #f0f0f0; color: #666; font-size: 18px;">
+        <i class="bi bi-lock-fill"></i>
+      </div>
+      <div>
+        <div style="font-size: 15px; font-weight: 700; color: var(--c-text); margin: 0;">Group 3 — Service</div>
+        <div style="font-size: 12px; color: var(--c-mute); margin-top: 2px;">Service workflow</div>
+      </div>
+      <span class="badge" style="margin-left: auto; background: #e9ecef; color: #495057; padding: 6px 14px; border-radius: 12px; font-weight: 600; font-size: 11px;">Locked</span>
+    </div>
+    <p class="hint" style="margin: 0; font-size: 12px;">Unlocks once you press <strong>Start Service</strong> above.</p>
+  </div>
+
+<% } else { %>
+  <!-- Service form active or complete -->
+  <div class="c-card">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--c-line);">
+      <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px; background: <% if (stage === 'done') { %>#28a745<% } else { %>#0066cc<% } %>; color: white; font-size: 18px;">
+        <i class="bi bi-wrench-adjustable"></i>
+      </div>
+      <div>
+        <div style="font-size: 15px; font-weight: 700; color: var(--c-text); margin: 0;">Group 3 — Service</div>
+        <div style="font-size: 12px; color: var(--c-mute); margin-top: 2px;">Record the service performed</div>
+      </div>
+      <span class="badge" style="margin-left: auto; background: <% if (stage === 'done') { %>#dcfce7<% } else { %>#fef3c7<% } %>; color: <% if (stage === 'done') { %>#166534<% } else { %>#92400e<% } %>; padding: 6px 14px; border-radius: 12px; font-weight: 600; font-size: 11px;">
+        <% if (stage === 'done') { %>Complete<% } else { %>Step 3 of 3<% } %>
+      </span>
+    </div>
+
+    <form method="POST" action="/calibrations/<%= calibration.id %>/service" id="serviceForm">
+
+      <!-- Technician Section -->
+      <div style="margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--c-line);">
+        <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.04em;">
+          <i class="bi bi-person-gear" style="color: var(--gold); margin-right: 4px;"></i> Technician *
+        </label>
+        <div data-repeatable-group="technician">
+          <div data-repeatable-rows id="technicianRows" style="display: flex; flex-direction: column; gap: 8px;">
+            <% const chosen = (calibration.technicians || '').split(',').map(t => t.trim()).filter(Boolean); %>
+            <% (chosen.length ? chosen : ['']).forEach((name, idx) => { %>
+              <div class="repeatable-row" data-repeatable-row data-option-field style="display: flex; align-items: center; gap: 8px;">
+                <select name="technician" class="option-select" <% if (idx === 0) { %>required<% } %>
+                        style="flex: 1; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px; background: white;">
+                  <option value="">Select technician…</option>
+                  <% if (typeof technicianOptions !== 'undefined') { %>
+                    <% technicianOptions.forEach(t => { %>
+                      <option value="<%= t %>" <% if (t === name) { %>selected<% } %>><%= t %></option>
+                    <% }) %>
+                  <% } %>
+                  <option value="__new__">+ Add another technician…</option>
+                </select>
+                <input type="text" name="technician_new" class="option-new-input"
+                       style="display: none; flex: 1; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px; background: white;"
+                       placeholder="Type technician name">
+                <button type="button" class="row-remove-btn" data-remove-row style="padding: 8px 10px; background: #f0f0f0; border: none; border-radius: 6px; cursor: pointer; color: #999;">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+            <% }) %>
+          </div>
+          <button type="button" class="c-btn secondary" data-add-row style="margin-top: 8px;">
+            <i class="bi bi-plus-lg"></i> Add Technician
+          </button>
+        </div>
+      </div>
+
+      <!-- Calibration Done Toggle -->
+      <div style="margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--c-line);">
+        <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.04em;">
+          <i class="bi bi-check2-square" style="color: var(--gold); margin-right: 4px;"></i> Calibration Done? *
+        </label>
+        <div style="display: flex; gap: 16px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="radio" name="done" value="Yes" data-done-radio required
+                   <% if (calibration.done === 'Yes') { %>checked<% } %>>
+            <span style="font-size: 13px; color: var(--c-text);">Done</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="radio" name="done" value="No" data-done-radio
+                   <% if (calibration.done !== 'Yes') { %>checked<% } %>>
+            <span style="font-size: 13px; color: var(--c-text);">Not Done</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Services & Amounts (shown only when Done = Yes) -->
+      <div id="serviceFields" style="display: none; margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--c-line);">
+        <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.04em;">
+          Calibration Services &amp; Amounts
+        </label>
+        <div data-repeatable-group="service">
+          <div data-repeatable-rows style="display: flex; flex-direction: column; gap: 8px;">
+            <% (typeof services !== 'undefined' && services.length ? services : [{ description: '', amount: '' }]).forEach(item => { %>
+              <div class="repeatable-row" data-repeatable-row style="display: flex; align-items: center; gap: 8px;">
+                <input type="text" name="service_description[]" placeholder="Calibration performed…" 
+                       value="<%= item.description || '' %>"
+                       style="flex: 1; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px;">
+                <div style="display: flex; align-items: center; gap: 4px; flex: 0 0 140px;">
+                  <span style="font-size: 12px; color: var(--c-mute);">Rs.</span>
+                  <input type="number" step="0.01" min="0" name="service_amount[]" placeholder="0.00" 
+                         value="<%= item.amount === null || item.amount === undefined ? '' : item.amount %>"
+                         style="flex: 1; padding: 10px 8px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px;">
+                </div>
+                <button type="button" class="row-remove-btn" data-remove-row style="padding: 8px 10px; background: #f0f0f0; border: none; border-radius: 6px; cursor: pointer; color: #999;">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+            <% }) %>
+          </div>
+          <button type="button" class="c-btn secondary" data-add-row style="margin-top: 8px;">
+            <i class="bi bi-plus-lg"></i> Add Service &amp; Amount
+          </button>
+        </div>
+      </div>
+
+      <!-- Repair Toggle -->
+      <div style="margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--c-line);">
+        <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.04em;">
+          <i class="bi bi-wrench-adjustable" style="color: var(--gold); margin-right: 4px;"></i> Repair? *
+        </label>
+        <div style="display: flex; gap: 16px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="radio" name="repair" value="Yes" data-repair-radio required
+                   <% if (calibration.repair === 'Yes') { %>checked<% } %>>
+            <span style="font-size: 13px; color: var(--c-text);">Yes</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="radio" name="repair" value="No" data-repair-radio
+                   <% if (calibration.repair !== 'Yes') { %>checked<% } %>>
+            <span style="font-size: 13px; color: var(--c-text);">No</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Repair Fields (Spare Parts & Repairs) -->
+      <div id="repairFields" style="display: none; margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--c-line);">
+        <!-- Spare Parts -->
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.04em;">
+            1. Spare Part Replacement
+          </label>
+          <div data-repeatable-group="spare_part">
+            <div data-repeatable-rows style="display: flex; flex-direction: column; gap: 8px;">
+              <% (typeof spareParts !== 'undefined' && spareParts.length ? spareParts : [{ description: '', amount: '' }]).forEach(item => { %>
+                <div class="repeatable-row" data-repeatable-row style="display: flex; align-items: center; gap: 8px;">
+                  <input type="text" name="spare_part_description[]" placeholder="Spare part…" 
+                         value="<%= item.description || '' %>"
+                         style="flex: 1; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px;">
+                  <div style="display: flex; align-items: center; gap: 4px; flex: 0 0 140px;">
+                    <span style="font-size: 12px; color: var(--c-mute);">Rs.</span>
+                    <input type="number" step="0.01" min="0" name="spare_part_amount[]" placeholder="0.00" 
+                           value="<%= item.amount === null || item.amount === undefined ? '' : item.amount %>"
+                           style="flex: 1; padding: 10px 8px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px;">
+                  </div>
+                  <button type="button" class="row-remove-btn" data-remove-row style="padding: 8px 10px; background: #f0f0f0; border: none; border-radius: 6px; cursor: pointer; color: #999;">
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </div>
+              <% }) %>
+            </div>
+            <button type="button" class="c-btn secondary" data-add-row style="margin-top: 8px;">
+              <i class="bi bi-plus-lg"></i> Add Spare Part &amp; Amount
+            </button>
+          </div>
+        </div>
+
+        <!-- Repair Items -->
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.04em;">
+            2. Description of Repair
+          </label>
+          <div data-repeatable-group="repair_item">
+            <div data-repeatable-rows style="display: flex; flex-direction: column; gap: 8px;">
+              <% (typeof repairItems !== 'undefined' && repairItems.length ? repairItems : [{ description: '', amount: '' }]).forEach(item => { %>
+                <div class="repeatable-row" data-repeatable-row style="display: flex; align-items: center; gap: 8px;">
+                  <input type="text" name="repair_item_description[]" placeholder="Type of service & repair…" 
+                         value="<%= item.description || '' %>"
+                         style="flex: 1; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px;">
+                  <div style="display: flex; align-items: center; gap: 4px; flex: 0 0 140px;">
+                    <span style="font-size: 12px; color: var(--c-mute);">Rs.</span>
+                    <input type="number" step="0.01" min="0" name="repair_item_amount[]" placeholder="0.00" 
+                           value="<%= item.amount === null || item.amount === undefined ? '' : item.amount %>"
+                           style="flex: 1; padding: 10px 8px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px;">
+                  </div>
+                  <button type="button" class="row-remove-btn" data-remove-row style="padding: 8px 10px; background: #f0f0f0; border: none; border-radius: 6px; cursor: pointer; color: #999;">
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </div>
+              <% }) %>
+            </div>
+            <button type="button" class="c-btn secondary" data-add-row style="margin-top: 8px;">
+              <i class="bi bi-plus-lg"></i> Add Repair &amp; Amount
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bill Summary -->
+      <div id="totalAmountRow" style="display: none; background: #f9fafb; border: 1px solid var(--c-line); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+        <div style="margin-bottom: 8px; display: flex; justify-content: space-between;">
+          <span class="hint">Subtotal</span>
+          <span style="font-weight: 600;">Rs. <span id="subTotalValue">0.00</span></span>
+        </div>
+        <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+          <span class="hint">Discount (Rs.)</span>
+          <input type="number" step="0.01" min="0" name="discount" id="discountInput"
+                 value="<%= calibration.discount || '' %>" placeholder="0.00"
+                 style="width: 140px; padding: 8px 10px; text-align: right; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px;">
+        </div>
+        <div style="margin-bottom: 8px; display: flex; justify-content: space-between;">
+          <span class="hint">Net Amount</span>
+          <span style="font-weight: 600;">Rs. <span id="netValue">0.00</span></span>
+        </div>
+        <div style="margin-bottom: 8px; display: flex; justify-content: space-between;">
+          <span class="hint">SSCL (<%= typeof totals !== 'undefined' ? totals.ssclLabel : '0%' %>)</span>
+          <span style="font-weight: 600;">Rs. <span id="ssclValue">0.00</span></span>
+        </div>
+        <div style="margin-bottom: 12px; display: flex; justify-content: space-between;">
+          <span class="hint">VAT (<%= typeof totals !== 'undefined' ? totals.vatLabel : '0%' %>)</span>
+          <span style="font-weight: 600;">Rs. <span id="vatValue">0.00</span></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-top: 1px solid var(--c-line); padding-top: 10px;">
+          <span style="font-weight: 700; color: #1a1a1a;">Final Total</span>
+          <span style="font-weight: 700; color: #1a1a1a; font-size: 16px;">Rs. <span id="finalTotalValue">0.00</span></span>
+        </div>
+      </div>
+
+      <!-- Status & Done Date -->
+      <div style="margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--c-line);">
+        <div style="margin-bottom: 12px;">
+          <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.04em;">
+            <i class="bi bi-info-circle" style="color: var(--gold); margin-right: 4px;"></i> Status
+          </label>
+          <input type="text" name="status" placeholder="e.g. Passed, Needs parts, Sent for repair…" 
+                 value="<%= calibration.status || '' %>"
+                 style="width: 100%; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px;">
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 600; color: var(--c-mute); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.04em;">
+            <i class="bi bi-calendar-check" style="color: var(--gold); margin-right: 4px;"></i> Done Date
+          </label>
+          <input type="date" name="done_date" id="doneDateInput" value="<%= calibration.done_date || '' %>"
+                 style="width: 100%; max-width: 300px; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 6px; font-size: 13px;">
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <div style="display: flex; gap: 12px;">
+        <button type="submit" class="c-btn primary">
+          <i class="bi bi-check-lg"></i> Save Service
+        </button>
+        <a href="/calibrations" class="c-btn secondary" style="text-decoration: none;">
+          <i class="bi bi-list-ul"></i> All Records
+        </a>
+      </div>
+    </form>
+  </div>
+<% } %>
+
+<!-- ===== STYLES ===== -->
+<style>
+  .c-card {
+    background: white;
+    border: 1px solid var(--c-line);
+    border-radius: 10px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    margin-bottom: 24px;
+  }
+
+  .c-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
+
+  .c-btn.primary {
+    background: #1AA9BC;
+    color: white;
+  }
+
+  .c-btn.primary:hover {
+    background: #138fa8;
+    transform: translateY(-1px);
+  }
+
+  .c-btn.secondary {
+    background: #f0f0f0;
+    color: #333;
+  }
+
+  .c-btn.secondary:hover {
+    background: #e0e0e0;
+  }
+
+  .c-btn.warning {
+    background: #f59e0b;
+    color: white;
+  }
+
+  .c-btn.warning:hover {
+    background: #d97706;
+    transform: translateY(-1px);
+  }
+
+  .hint {
+    color: var(--c-mute);
+    font-size: 12px;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  :root {
+    --c-line: #e8ecf1;
+    --c-mute: #7a8a99;
+    --c-text: #1a1a1a;
+    --gold: #D4AF37;
+  }
+</style>
+
+<script>
+  const SSCL_RATE = <%= typeof totals !== 'undefined' ? totals.ssclRate : 0 %>;
+  const VAT_RATE = <%= typeof totals !== 'undefined' ? totals.vatRate : 0 %>;
+
+  const serviceForm = document.getElementById('serviceForm');
+
+  if (serviceForm) {
+    // ---- Option Select (Technician "+ Add new…") ----
+    function wireOptionSelect(select) {
+      select.addEventListener('change', () => {
+        const wrap = select.closest('[data-option-field]');
+        if (!wrap) return;
+        const newInput = wrap.querySelector('.option-new-input');
+        if (select.value === '__new__') {
+          newInput.style.display = 'block';
+          newInput.required = true;
+          newInput.value = '';
+          newInput.focus();
+        } else {
+          newInput.style.display = 'none';
+          newInput.required = false;
+          newInput.value = '';
+        }
+      });
+    }
+    document.querySelectorAll('.option-select').forEach(wireOptionSelect);
+
+    // ---- Calibration Done Toggle ----
+    const serviceFields = document.getElementById('serviceFields');
+    document.querySelectorAll('[data-done-radio]').forEach((radio) => {
+      radio.addEventListener('change', () => {
+        const yesChecked = document.querySelector('[data-done-radio][value="Yes"]').checked;
+        serviceFields.style.display = yesChecked ? 'block' : 'none';
+        updateTotal();
+      });
+    });
+
+    // ---- Repair Toggle ----
+    const repairFields = document.getElementById('repairFields');
+    document.querySelectorAll('[data-repair-radio]').forEach((radio) => {
+      radio.addEventListener('change', () => {
+        const yesChecked = document.querySelector('[data-repair-radio][value="Yes"]').checked;
+        repairFields.style.display = yesChecked ? 'block' : 'none';
+        updateTotal();
+      });
+    });
+
+    // ---- Repeatable Row Groups ----
+    function initRepeatableGroup(groupEl) {
+      const rowsWrap = groupEl.querySelector('[data-repeatable-rows]');
+      const addBtn = groupEl.querySelector('[data-add-row]');
+
+      addBtn.addEventListener('click', () => {
+        const firstRow = rowsWrap.querySelector('[data-repeatable-row]');
+        const clone = firstRow.cloneNode(true);
+        clone.querySelectorAll('input').forEach((el) => { el.value = ''; });
+        clone.querySelectorAll('select').forEach((el) => { el.selectedIndex = 0; el.required = false; });
+        clone.querySelectorAll('.option-new-input').forEach((el) => { el.style.display = 'none'; el.required = false; });
+        rowsWrap.appendChild(clone);
+        clone.querySelectorAll('.option-select').forEach(wireOptionSelect);
+      });
+
+      rowsWrap.addEventListener('click', (e) => {
+        const removeBtn = e.target.closest('[data-remove-row]');
+        if (!removeBtn) return;
+        const rows = rowsWrap.querySelectorAll('[data-repeatable-row]');
+        if (rows.length <= 1) {
+          const row = removeBtn.closest('[data-repeatable-row]');
+          row.querySelectorAll('input').forEach((el) => { el.value = ''; });
+          row.querySelectorAll('select').forEach((el) => { el.selectedIndex = 0; });
+          return;
+        }
+        removeBtn.closest('[data-repeatable-row]').remove();
+        updateTotal();
+      });
+    }
+
+    document.querySelectorAll('[data-repeatable-group]').forEach(initRepeatableGroup);
+
+    // ---- Live Bill Calculation ----
+    const totalAmountRow = document.getElementById('totalAmountRow');
+    const subTotalValue = document.getElementById('subTotalValue');
+    const netValue = document.getElementById('netValue');
+    const discountInput = document.getElementById('discountInput');
+    const ssclValue = document.getElementById('ssclValue');
+    const vatValue = document.getElementById('vatValue');
+    const finalTotalValue = document.getElementById('finalTotalValue');
+
+    const money = (n) => Number(n || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+    function updateTotal() {
+      let subtotal = 0;
+      let anyVisible = false;
+
+      document.querySelectorAll('input[name$="_amount[]"]').forEach((input) => {
+        const group = input.closest('#serviceFields, #repairFields');
+        const groupVisible = group ? group.style.display !== 'none' : true;
+        if (groupVisible) {
+          anyVisible = true;
+          subtotal += Number(input.value) || 0;
+        }
+      });
+
+      const discount = Math.min(Math.max(Number(discountInput.value) || 0, 0), subtotal);
+      const net = subtotal - discount;
+      const sscl = net * SSCL_RATE;
+      const vat = (net + sscl) * VAT_RATE;
+
+      subTotalValue.textContent = money(subtotal);
+      netValue.textContent = money(net);
+      ssclValue.textContent = money(sscl);
+      vatValue.textContent = money(vat);
+      finalTotalValue.textContent = money(net + sscl + vat);
+      totalAmountRow.style.display = anyVisible ? 'block' : 'none';
+    }
+
+    serviceForm.addEventListener('input', (e) => {
+      if (e.target.matches('input[name$="_amount[]"]') || e.target.id === 'discountInput') updateTotal();
+    });
+
+    const doneYes = document.querySelector('[data-done-radio][value="Yes"]');
+    const repairYes = document.querySelector('[data-repair-radio][value="Yes"]');
+    if (doneYes && doneYes.checked) serviceFields.style.display = 'block';
+    if (repairYes && repairYes.checked) repairFields.style.display = 'block';
+    updateTotal();
+  }
+
+  // ---- Approval Page Script ----
+  const approvalForm = document.querySelector('form[action*="/approval"]');
+  if (approvalForm) {
+    (function () {
+      const today = new Date().toISOString().split("T")[0];
+
+      function paint(box) {
+        const slot = document.getElementById(box.dataset.dateSlot);
+        if (!slot) return;
+        const saved = slot.dataset.savedDate;
+
+        if (!box.checked) {
+          slot.innerHTML = '<span style="font-size: 12px; color: var(--c-mute);">—</span>';
+          return;
+        }
+
+        slot.innerHTML = saved
+          ? '<span class="badge" style="background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 10px;"><i class="bi bi-calendar-check"></i> ' + saved + '</span>'
+          : '<span class="badge" style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 10px;"><i class="bi bi-calendar-check"></i> ' + today + '</span>';
+      }
+
+      document.querySelectorAll("[data-approval-box]").forEach((box) => {
+        box.addEventListener("change", () => paint(box));
+        paint(box);
+      });
+    })();
+
+    (function () {
+      const toggle = document.getElementById("releaseToggle");
+      const saveExit = document.getElementById("saveExitBtn");
+      const startBtn = document.getElementById("startServiceBtn");
+      const hint = document.getElementById("releaseHint");
+      const dateSlot = document.getElementById("releaseDate");
+      const today = new Date().toISOString().split("T")[0];
+      const saveBtn = document.getElementById("saveBtn");
+
+      function sync() {
+        const on = toggle.checked;
+        saveExit.style.display = on ? "" : "none";
+        startBtn.style.display = on ? "none" : "";
+        saveBtn.style.display = on ? "none" : "";
+        hint.style.display = on ? "block" : "none";
+        dateSlot.innerHTML = on
+          ? '<span class="badge" style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 10px;"><i class="bi bi-calendar-check"></i> ' + today + '</span>'
+          : '<span style="font-size: 12px; color: var(--c-mute);">—</span>';
+      }
+
+      toggle.addEventListener("change", sync);
+      sync();
+    })();
+  }
+</script>
+
+<%- include('../partials/console-footer') %>

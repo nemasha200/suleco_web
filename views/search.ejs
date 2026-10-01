@@ -12,7 +12,57 @@
 <% if (!q) { %>
   <div class="empty-state">Type a serial number in the search box above and hit Search.</div>
 <% } else if (results.length === 0) { %>
-  <div class="empty-state">No equipment matched "<%= q %>".</div>
+  <!-- A miss is a dead end unless we offer the next step. Both routes carry
+       the typed text across so nothing has to be retyped. -->
+  <div class="card" style="max-width: 620px; margin: 0 auto; text-align: center; padding: 32px 28px;">
+    <i class="bi bi-search" style="font-size: 32px; color: var(--gold);"></i>
+    <h2 style="font-size: 19px; margin: 14px 0 6px;">Nothing on file for &ldquo;<%= q %>&rdquo;</h2>
+    <p class="hint" style="margin-bottom: 22px;">
+      No equipment has that serial number. Register the instrument, add the customer first if
+      they are new, or go back and try another serial.
+    </p>
+
+    <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">
+      <a href="/equipment/new?serial=<%= encodeURIComponent(q) %>" class="btn gold">
+        <i class="bi bi-box-seam"></i> Add as New Equipment
+      </a>
+      <!-- No name is passed: the box searches serials, so the typed text is a
+           serial, not a company name. This is a shortcut to the blank form. -->
+      <a href="/customers/new" class="btn secondary">
+        <i class="bi bi-person-plus"></i> Add New Customer
+      </a>
+      <a href="/" class="btn secondary">
+        <i class="bi bi-speedometer2"></i> Back to Dashboard
+      </a>
+    </div>
+
+    <div class="hint" style="margin-top: 18px;">
+      Shortcuts: press <kbd>E</kbd> to add equipment, <kbd>C</kbd> to add a customer,
+      <kbd>D</kbd> for the dashboard, <kbd>Esc</kbd> to search again.
+    </div>
+  </div>
+
+  <script>
+    // Single-key shortcuts, ignored while typing so they never hijack a field.
+    const SEARCH_TERM = <%- JSON.stringify(q) %>;
+    document.addEventListener("keydown", (e) => {
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      const tag = (e.target.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") {
+        if (e.key === "Escape") e.target.blur();
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+      if (key === "d") window.location.href = "/";
+      else if (key === "e") window.location.href = "/equipment/new?serial=" + encodeURIComponent(SEARCH_TERM);
+      else if (key === "c") window.location.href = "/customers/new";
+      else if (e.key === "Escape") {
+        const box = document.querySelector('input[name="q"]');
+        if (box) { box.focus(); box.select(); }
+      }
+    });
+  </script>
 <% } else { %>
 
   <% results.forEach(e => { %>
@@ -33,7 +83,15 @@
           <form method="POST" action="/equipment/<%= e.id %>/mark-done" style="display:inline">
             <button type="submit" class="btn small secondary">Mark Done Today</button>
           </form>
-          <a href="/calibrations/new" class="btn small gold">+ Add Calibration</a>
+          <% if (e.openJobId) { %>
+            <a href="/calibrations/<%= e.openJobId %>/workflow" class="btn small gold">
+              <i class="bi bi-arrow-right-circle"></i> Continue Job
+            </a>
+          <% } else { %>
+            <a href="/calibrations/new?equipment_id=<%= e.id %>" class="btn small gold">
+              <i class="bi bi-box-arrow-in-down"></i> Check In
+            </a>
+          <% } %>
         </div>
       </div>
 

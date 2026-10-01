@@ -1,47 +1,479 @@
-<%- include('partials/header', { title: 'Dashboard — Calibration Tracker', username, bodyClass: 'has-page-bg', activeNav: 'dashboard' }) %>
+<%- include('partials/console-header', {
+  title: 'Dashboard — Technical Tracker',
+  username,
+  activeNav: 'dashboard',
+  alertCount: overdueCount,
+}) %>
 
-<h1>Dashboard</h1>
-<p class="subtitle">Upcoming and overdue calibrations, sorted soonest first.</p>
+<%
+  // ---- Small view helpers -------------------------------------------------
+  // Kept here rather than in the route: these are purely about how a number is
+  // drawn, not about what it means.
+  const rs = (n) => Number(n || 0).toFixed(2).replace(/\.00$/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const pctClass = (p) => (p >= 75 ? 'green' : p >= 50 ? 'amber' : 'red');
+
+  // Turn a list of values into an SVG polyline inside a WxH box. The Y axis is
+  // scaled to the largest value, with a flat line when every value is equal
+  // (which would otherwise divide by zero).
+  const points = (values, w, h, pad) => {
+    if (!values.length) return '';
+    const max = Math.max(...values);
+    const min = Math.min(...values);
+    const span = max - min || 1;
+    const step = values.length > 1 ? (w - pad * 2) / (values.length - 1) : 0;
+    return values.map((v, i) => {
+      const x = pad + step * i;
+      const y = h - pad - ((v - min) / span) * (h - pad * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+  };
+%>
+
+<!-- ===== Department bar =====
+     Filters the whole page. Each pill is a plain link carrying ?dept=, so the
+     selection survives a refresh, can be bookmarked, and works with the
+     browser's back button — no JavaScript involved. -->
+<section class="c-deptbar">
+  <div class="c-deptbar__id">
+    <div class="c-deptbar__name">Technical Tracker</div>
+    <div class="c-deptbar__org">SULECO (Pvt) Ltd · Technical Department</div>
+  </div>
+
+  <nav class="c-deptbar__pills" aria-label="Filter by department">
+    <a href="/" class="<%= dept ? '' : 'active' %>">All departments</a>
+    <% departments.forEach((d, i) => { %>
+      <a href="/?dept=<%= encodeURIComponent(d) %>" class="<%= dept === d ? 'active' : '' %>">
+        <span class="c-dot" style="background: <%= ['#2563EB', '#16A34A', '#D98A0B'][i % 3] %>;"></span><%= d %>
+      </a>
+    <% }) %>
+  </nav>
+
+  <div class="c-deptbar__date"><%= new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) %></div>
+</section>
+
+<!-- Automation status: proof the daily reminder job is alive. Carried over
+     from the old dashboard — it is the one thing on this page that tells you
+     the system is working when nothing else has changed. -->
+<section class="c-auto <%= automation.tone %>">
+  <div>
+    <div class="c-auto__headline">
+      <%= automation.headline %>
+      <% if (automation.wasCatchUp) { %><span class="c-auto__tag">ran late</span><% } %>
+    </div>
+    <div class="c-auto__detail"><%= automation.detail %></div>
+  </div>
+  <div class="c-auto__right">
+    <div>Next check <strong><%= automation.nextRun %></strong></div>
+    <a href="/notifications">See what was sent</a>
+    <form method="POST" action="/notify-now" style="display:inline; margin-left:10px;">
+      <button type="submit" class="c-auto__send"><i class="bi bi-send"></i> Send now</button>
+    </form>
+  </div>
+</section>
 
 <% if (typeof flash !== 'undefined' && flash) { %>
-  <div id="flashAlert" class="alert alert-success alert-dismissible fade show d-flex align-items-center gap-2" role="alert">
-    <i class="bi bi-check-circle-fill"></i>
-    <div><%= flash %></div>
+  <div id="flashAlert" class="alert alert-success alert-dismissible fade show" role="alert">
+    <i class="bi bi-check-circle-fill"></i> <%= flash %>
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
   </div>
 <% } %>
 
-<!-- Automation status: is the daily job alive, what did it last do, when next. -->
-<section class="auto-status auto-status--<%= automation.tone %>">
-  <span class="auto-status__dot" aria-hidden="true"></span>
 
-  <div class="auto-status__body">
-    <div class="auto-status__headline">
-      <%= automation.headline %>
-      <% if (automation.wasCatchUp) { %>
-        <span class="auto-status__tag" title="The app was not running at <%= automation.runTimeLabel %>, so it sent the reminders as soon as it started up.">ran late</span>
+<div class="console-grid">
+
+  <!-- ===================== COLUMN 1 ===================== -->
+  <div class="console-col">
+
+    <!-- Income -->
+    <section class="c-card">
+      <div class="c-card__head">
+        <div class="c-card__icon green"><i class="bi bi-cash-stack"></i></div>
+        <div>
+          <div class="c-card__title">Income <span style="font-weight:500; color:var(--c-mute);">(Monthly)</span></div>
+          <div class="c-card__sub">Billed services, incl. SSCL &amp; VAT</div>
+        </div>
+      </div>
+
+      <div class="c-income">
+        <div class="c-income__left">
+          <div class="c-income__value">Rs. <%= rs(income.thisMonth) %></div>
+          <% if (income.changePct === null) { %>
+            <span class="c-income__delta flat"><i class="bi bi-dash"></i> No prior month</span>
+          <% } else { %>
+            <span class="c-income__delta <%= income.changePct >= 0 ? 'up' : 'down' %>">
+              <i class="bi bi-arrow-<%= income.changePct >= 0 ? 'up' : 'down' %>"></i>
+              <%= Math.abs(income.changePct).toFixed(0) %>%
+            </span>
+            <span class="c-income__vs">vs. last month</span>
+          <% } %>
+        </div>
+
+        <div class="c-legend">
+          <div class="c-legend__row"><span class="c-dot blue"></span> All services <b><%= income.allJobs %></b></div>
+          <div class="c-legend__row"><span class="c-dot amber"></span> Pending <b><%= income.pending %></b></div>
+          <div class="c-legend__row"><span class="c-dot green"></span> Completed <b><%= income.completed %></b></div>
+        </div>
+      </div>
+
+      <!-- Sparkline: last 6 months of billed income -->
+      <% const incomeValues = income.series.map(s => s.value); %>
+      <svg class="c-chart" viewBox="0 0 640 150" preserveAspectRatio="none" role="img"
+           aria-label="Monthly income for the last <%= income.series.length %> months">
+        <defs>
+          <linearGradient id="incomeFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#2563EB" stop-opacity=".22"/>
+            <stop offset="100%" stop-color="#2563EB" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <% const ip = points(incomeValues, 640, 150, 18); %>
+        <% if (ip) { %>
+          <polygon fill="url(#incomeFill)" points="18,132 <%= ip %> 622,132"/>
+          <polyline fill="none" stroke="#2563EB" stroke-width="2.5" stroke-linejoin="round" points="<%= ip %>"/>
+          <% ip.split(' ').forEach((pt, i) => { const [x, y] = pt.split(','); %>
+            <circle cx="<%= x %>" cy="<%= y %>" r="<%= i === incomeValues.length - 1 ? 5 : 3.2 %>"
+                    fill="#fff" stroke="#2563EB" stroke-width="2.5"/>
+          <% }) %>
+        <% } %>
+      </svg>
+      <div class="c-chart-labels">
+        <% income.series.forEach(s => { %><span><%= s.label %></span><% }) %>
+      </div>
+    </section>
+
+    <!-- Tracking summary -->
+    <section class="c-card">
+      <div class="c-card__head">
+        <div class="c-card__icon teal"><i class="bi bi-calendar2-check-fill"></i></div>
+        <div>
+          <div class="c-card__title">Tracking Summary</div>
+          <div class="c-card__sub">Overdue · Due in 7 days · Count</div>
+        </div>
+      </div>
+
+      <div class="c-tracking">
+        <a href="/equipment/new">
+          <div class="c-tracking__num red"><%= overdueCount %></div>
+          <div class="c-tracking__label">Overdue</div>
+        </a>
+        <a href="/equipment/new">
+          <div class="c-tracking__num amber"><%= dueSoonCount %></div>
+          <div class="c-tracking__label">Due in 7 days</div>
+        </a>
+        <a href="/equipment/new">
+          <div class="c-tracking__num blue"><%= totalCount %></div>
+          <div class="c-tracking__label">Total</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- Notifications -->
+    <section class="c-card">
+      <div class="c-card__head">
+        <div class="c-card__icon amber"><i class="bi bi-bell-fill"></i></div>
+        <div>
+          <div class="c-card__title">Notifications</div>
+          <div class="c-card__sub">What needs attention</div>
+        </div>
+        <a href="/notifications" class="c-card__link">View All <i class="bi bi-arrow-right"></i></a>
+      </div>
+
+      <% if (notifications.length === 0) { %>
+        <div class="c-empty">Nothing needs attention right now.</div>
+      <% } else { %>
+        <% notifications.forEach(n => { %>
+          <a class="c-feed" href="<%= n.href %>">
+            <span class="c-feed__dot" style="background: var(--c-<%= n.tone === 'blue' ? 'blue' : n.tone %>);"></span>
+            <div style="min-width:0;">
+              <div class="c-feed__text"><%= n.text %></div>
+              <div class="c-feed__meta"><%= n.meta %></div>
+            </div>
+          </a>
+        <% }) %>
       <% } %>
+    </section>
+
+    <div class="c-banner">
+      <div class="c-banner__icon"><i class="bi bi-gear-fill"></i></div>
+      <div>
+        <div class="c-banner__title">Your Calibration System, Our Priority</div>
+        <div class="c-banner__sub">Accurate. Reliable. Always.</div>
+      </div>
     </div>
-    <div class="auto-status__detail"><%= automation.detail %></div>
   </div>
 
-  <div class="auto-status__meta">
-    <div class="auto-status__next">Next check <strong><%= automation.nextRun %></strong></div>
-    <a href="/notifications" class="auto-status__link">See what was sent</a>
+  <!-- ===================== COLUMN 2 ===================== -->
+  <div class="console-col">
+
+    <!-- Reports -->
+    <section class="c-card">
+      <div class="c-card__head">
+        <div class="c-card__icon blue"><i class="bi bi-file-earmark-text-fill"></i></div>
+        <div>
+          <div class="c-card__title">Reports</div>
+          <div class="c-card__sub">Download detailed records</div>
+        </div>
+        <a href="/export.csv" class="c-card__link">View All <i class="bi bi-arrow-right"></i></a>
+      </div>
+
+      <a class="c-rowlink" href="/export.csv">
+        <span class="c-rowlink__icon"><i class="bi bi-bar-chart-fill"></i></span>
+        <div>
+          <div class="c-rowlink__title">Full Report</div>
+          <div class="c-rowlink__sub">Every customer, equipment and amount</div>
+        </div>
+        <i class="bi bi-chevron-right c-rowlink__chev"></i>
+      </a>
+      <a class="c-rowlink" href="/export.csv?category=Survey">
+        <span class="c-rowlink__icon"><i class="bi bi-rulers"></i></span>
+        <div>
+          <div class="c-rowlink__title">Survey Report</div>
+          <div class="c-rowlink__sub">Survey division equipment only</div>
+        </div>
+        <i class="bi bi-chevron-right c-rowlink__chev"></i>
+      </a>
+      <a class="c-rowlink" href="/export.csv?category=Lab">
+        <span class="c-rowlink__icon"><i class="bi bi-clipboard2-pulse-fill"></i></span>
+        <div>
+          <div class="c-rowlink__title">Lab Report</div>
+          <div class="c-rowlink__sub">Lab equipment &amp; service details</div>
+        </div>
+        <i class="bi bi-chevron-right c-rowlink__chev"></i>
+      </a>
+      <a class="c-rowlink" href="/export.csv?category=Drones">
+        <span class="c-rowlink__icon"><i class="bi bi-airplane-engines-fill"></i></span>
+        <div>
+          <div class="c-rowlink__title">Drone Report</div>
+          <div class="c-rowlink__sub">Drone fleet &amp; usage summary</div>
+        </div>
+        <i class="bi bi-chevron-right c-rowlink__chev"></i>
+      </a>
+    </section>
+
+    <!-- Forecast -->
+    <section class="c-card">
+      <div class="c-card__head">
+        <div class="c-card__icon green"><i class="bi bi-graph-up-arrow"></i></div>
+        <div>
+          <div class="c-card__title">Predictions</div>
+          <div class="c-card__sub">Calibrations falling due, next 7 days</div>
+        </div>
+      </div>
+
+      <% const fcValues = forecast.map(f => f.count); const fcTotal = fcValues.reduce((a, b) => a + b, 0); %>
+      <svg class="c-chart" viewBox="0 0 640 150" preserveAspectRatio="none" role="img"
+           aria-label="Equipment due per day over the next seven days">
+        <defs>
+          <linearGradient id="fcFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#16A34A" stop-opacity=".2"/>
+            <stop offset="100%" stop-color="#16A34A" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <% const fp = points(fcValues, 640, 150, 18); %>
+        <% if (fp) { %>
+          <polygon fill="url(#fcFill)" points="18,132 <%= fp %> 622,132"/>
+          <polyline fill="none" stroke="#16A34A" stroke-width="2.5" stroke-linejoin="round" points="<%= fp %>"/>
+          <% fp.split(' ').forEach((pt) => { const [x, y] = pt.split(','); %>
+            <circle cx="<%= x %>" cy="<%= y %>" r="3.4" fill="#fff" stroke="#16A34A" stroke-width="2.5"/>
+          <% }) %>
+        <% } %>
+      </svg>
+      <div class="c-chart-labels">
+        <% forecast.forEach(f => { %><span><%= f.label %></span><% }) %>
+      </div>
+      <div class="c-card__sub" style="margin-top:10px;">
+        <strong><%= fcTotal %></strong> item<%= fcTotal === 1 ? '' : 's' %> due in the next 7 days.
+      </div>
+    </section>
+
+    <!-- Customers -->
+    <section class="c-card">
+      <div class="c-card__head">
+        <div class="c-card__icon navy"><i class="bi bi-people-fill"></i></div>
+        <div>
+          <div class="c-card__title">Regular Customers</div>
+          <div class="c-card__sub">By number of services</div>
+        </div>
+        <a href="/customers" class="c-card__link">View All <i class="bi bi-arrow-right"></i></a>
+      </div>
+
+      <% if (customers.length === 0) { %>
+        <div class="c-empty">No customers on file yet.</div>
+      <% } else { %>
+        <table class="c-table">
+          <thead>
+            <tr><th>Customer</th><th style="text-align:left;">Services</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            <% customers.forEach(c => { %>
+              <tr>
+                <td>
+                  <span class="c-avatar"><%= (c.company || c.name || '?').slice(0, 2).toUpperCase() %></span>
+                  <%= c.company || c.name %>
+                </td>
+                <td style="text-align:left;"><%= c.service_count %></td>
+                <td>
+                  <span class="c-pill <%= c.active ? 'green' : 'grey' %>"><%= c.active ? 'Active' : 'Idle' %></span>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+    </section>
   </div>
-</section>
+
+  <!-- ===================== COLUMN 3 ===================== -->
+  <div class="console-col">
+
+    <!-- Division performance -->
+    <section class="c-card">
+      <div class="c-card__head">
+        <div class="c-card__icon teal"><i class="bi bi-bullseye"></i></div>
+        <div>
+          <div class="c-card__title">Division Performance</div>
+          <div class="c-card__sub">Equipment currently in date<%= dept ? ' · all departments' : '' %></div>
+        </div>
+      </div>
+
+      <!-- Grouped bars: services logged per month vs services completed. -->
+      <%
+        const barMax = Math.max(1, ...jobsByMonth.map(m => m.total));
+        const barW = 14, gap = 6, groupW = barW * 2 + gap;
+        const slot = 620 / Math.max(1, jobsByMonth.length);
+      %>
+      <svg class="c-chart" viewBox="0 0 640 140" role="img" aria-label="Services logged and completed per month">
+        <line x1="10" y1="116" x2="630" y2="116" stroke="#E4EAF2" stroke-width="1"/>
+        <% jobsByMonth.forEach((m, i) => {
+             const cx = 10 + slot * i + slot / 2;
+             const hTotal = (m.total / barMax) * 96;
+             const hDone = (m.done / barMax) * 96;
+        %>
+          <rect x="<%= (cx - groupW / 2).toFixed(1) %>" y="<%= (116 - hDone).toFixed(1) %>"
+                width="<%= barW %>" height="<%= Math.max(hDone, 1).toFixed(1) %>" rx="3" fill="#2563EB"/>
+          <rect x="<%= (cx - groupW / 2 + barW + gap).toFixed(1) %>" y="<%= (116 - hTotal).toFixed(1) %>"
+                width="<%= barW %>" height="<%= Math.max(hTotal, 1).toFixed(1) %>" rx="3" fill="#BFD4F5"/>
+          <text x="<%= cx.toFixed(1) %>" y="132" text-anchor="middle" font-size="11" fill="#6B7A90"><%= m.label %></text>
+        <% }) %>
+      </svg>
+      <div style="display:flex; gap:16px; justify-content:center; font-size:11.5px; color:var(--c-mute); margin-bottom:6px;">
+        <span><span class="c-dot blue" style="display:inline-block; margin-right:5px;"></span>Completed</span>
+        <span><span class="c-dot" style="display:inline-block; margin-right:5px; background:#BFD4F5;"></span>Logged</span>
+      </div>
+
+      <% divisions.forEach((d, i) => { %>
+        <div class="c-rank">
+          <span class="c-rank__no"><%= i + 1 %></span>
+          <div>
+            <div class="c-rank__name"><%= d.name %></div>
+            <div class="c-rank__meta"><%= d.inDate %> of <%= d.total %> in date</div>
+          </div>
+          <span class="c-rank__pct <%= pctClass(d.percent) %>"><%= d.percent %>%</span>
+        </div>
+      <% }) %>
+    </section>
+
+    <!-- Division donut -->
+    <section class="c-card">
+      <div class="c-card__head">
+        <div class="c-card__icon navy"><i class="bi bi-pie-chart-fill"></i></div>
+        <div>
+          <div class="c-card__title">Technical Department</div>
+          <div class="c-card__sub">Equipment by division<%= dept ? ' · all departments' : '' %></div>
+        </div>
+      </div>
+
+      <%
+        // Donut drawn with stroke-dasharray on a circle: each slice is a dash
+        // the length of its share of the circumference, offset by everything
+        // before it. No library, no canvas.
+        const R = 58, CIRC = 2 * Math.PI * R;
+        const sliceColours = ['#2563EB', '#E9A23B', '#16A34A', '#C3CEDE'];
+        let offset = 0;
+      %>
+      <div class="c-donut-wrap">
+        <div class="c-donut">
+          <svg viewBox="0 0 158 158" width="158" height="158" role="img" aria-label="Equipment split by division">
+            <circle cx="79" cy="79" r="<%= R %>" fill="none" stroke="#EDF1F7" stroke-width="20"/>
+            <% if (divisionMix.total > 0) { %>
+              <% divisionMix.slices.forEach((s, i) => {
+                   if (!s.count) return;
+                   const len = (s.count / divisionMix.total) * CIRC;
+              %>
+                <circle cx="79" cy="79" r="<%= R %>" fill="none"
+                        stroke="<%= sliceColours[i % sliceColours.length] %>" stroke-width="20"
+                        stroke-dasharray="<%= len.toFixed(2) %> <%= (CIRC - len).toFixed(2) %>"
+                        stroke-dashoffset="<%= (-offset).toFixed(2) %>"
+                        transform="rotate(-90 79 79)"/>
+                <% offset += len; %>
+              <% }) %>
+            <% } %>
+          </svg>
+          <div class="c-donut__centre">
+            <div class="c-donut__label">Total</div>
+            <div class="c-donut__total"><%= divisionMix.total %></div>
+          </div>
+        </div>
+
+        <div class="c-donut-legend">
+          <% divisionMix.slices.forEach((s, i) => { %>
+            <div class="c-legend__row">
+              <span class="c-dot" style="background: <%= sliceColours[i % sliceColours.length] %>;"></span>
+              <%= s.name %> <b><%= s.count %></b>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+
+      <div style="margin-top:14px;">
+        <div style="display:flex; justify-content:space-between; font-size:12.5px;">
+          <span style="color:var(--c-mute);">Equipment in date</span>
+          <strong><%= inDateCount %> / <%= totalCount %></strong>
+        </div>
+        <div class="c-progress">
+          <span style="width: <%= totalCount > 0 ? Math.round((inDateCount / totalCount) * 100) : 0 %>%;"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Recent activity -->
+    <section class="c-card">
+      <div class="c-card__head">
+        <div class="c-card__icon blue"><i class="bi bi-clock-history"></i></div>
+        <div>
+          <div class="c-card__title">Recent Activity</div>
+          <div class="c-card__sub">Latest services and registrations</div>
+        </div>
+        <a href="/calibrations" class="c-card__link">View All <i class="bi bi-arrow-right"></i></a>
+      </div>
+
+      <% if (activity.length === 0) { %>
+        <div class="c-empty">No activity logged yet.</div>
+      <% } else { %>
+        <% activity.forEach(a => { %>
+          <div class="c-feed">
+            <span class="c-feed__time"><%= a.time %></span>
+            <span class="c-feed__dot" style="background: var(--c-<%= a.tone %>);"></span>
+            <div style="min-width:0;">
+              <div class="c-feed__text"><%= a.text %></div>
+              <div class="c-feed__meta"><%= a.ago %></div>
+            </div>
+          </div>
+        <% }) %>
+      <% } %>
+    </section>
+  </div>
+</div>
 
 <!-- ===== Proof-of-send popup: appears once, right after an automatic run ===== -->
 <% if (autoRun) { %>
 <div class="modal fade" id="autoRunModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
-      <div class="modal-header" style="background:var(--navy); color:#fff;">
+      <div class="modal-header" style="background:#0B2545; color:#fff;">
         <h5 class="modal-title">
-          <i class="bi bi-send-check"></i>
-          Automatic reminders sent
+          <i class="bi bi-send-check"></i> Automatic reminders sent
           <% if (autoRun.trigger_type === 'catchup') { %>
-            <span class="badge badge-amber" style="vertical-align:middle;">catch-up run</span>
+            <span class="c-auto__tag">catch-up run</span>
           <% } %>
         </h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -50,23 +482,14 @@
       <div class="modal-body">
         <p class="mb-3">
           The scheduled job ran on <strong><%= autoRun.run_date %></strong>
-          and finished at <strong><%= autoRun.finished_at %></strong>.
-          No one had to press a button.
+          and finished at <strong><%= autoRun.finished_at %></strong>. No one had to press a button.
         </p>
 
         <div class="row g-2 mb-3 text-center">
-          <div class="col-6 col-md-3">
-            <div class="stat-card"><div class="num"><%= autoRun.checked %></div><div class="label">Items checked</div></div>
-          </div>
-          <div class="col-6 col-md-3">
-            <div class="stat-card"><div class="num"><%= autoRun.notified %></div><div class="label">Reminders sent</div></div>
-          </div>
-          <div class="col-6 col-md-3">
-            <div class="stat-card"><div class="num"><%= autoRun.email_sent %></div><div class="label">Emails delivered</div></div>
-          </div>
-          <div class="col-6 col-md-3">
-            <div class="stat-card"><div class="num"><%= autoRun.sms_sent %></div><div class="label">SMS delivered</div></div>
-          </div>
+          <div class="col-6 col-md-3"><div class="c-card" style="padding:12px;"><div class="c-tracking__num blue"><%= autoRun.checked %></div><div class="c-tracking__label">Items checked</div></div></div>
+          <div class="col-6 col-md-3"><div class="c-card" style="padding:12px;"><div class="c-tracking__num blue"><%= autoRun.notified %></div><div class="c-tracking__label">Reminders sent</div></div></div>
+          <div class="col-6 col-md-3"><div class="c-card" style="padding:12px;"><div class="c-tracking__num blue"><%= autoRun.email_sent %></div><div class="c-tracking__label">Emails delivered</div></div></div>
+          <div class="col-6 col-md-3"><div class="c-card" style="padding:12px;"><div class="c-tracking__num blue"><%= autoRun.sms_sent %></div><div class="c-tracking__label">SMS delivered</div></div></div>
         </div>
 
         <% if (autoRun.email_failed > 0 || autoRun.sms_failed > 0) { %>
@@ -82,35 +505,26 @@
         <% } %>
 
         <% if (autoRun.recipientList.length === 0) { %>
-          <div class="empty-state" style="margin:0;">
+          <div class="c-empty">
             Nothing was due within the reminder window, so no messages needed to be sent.
             The job still ran — that is what this record proves.
           </div>
         <% } else { %>
-          <div class="hint mb-2" style="font-weight:700; text-transform:uppercase; letter-spacing:.04em; font-size:12px;">
-            Who was contacted
-          </div>
-          <table>
+          <table class="c-table">
             <thead>
-              <tr><th>Customer</th><th>Equipment</th><th>Due</th><th>Email</th><th>SMS</th></tr>
+              <tr><th>Customer</th><th style="text-align:left;">Equipment</th><th style="text-align:left;">Due</th><th style="text-align:left;">Email</th><th>SMS</th></tr>
             </thead>
             <tbody>
               <% autoRun.recipientList.forEach(r => { %>
                 <tr>
-                                    <td>
+                  <td>
                     <%= r.customer %>
-                    <% if (r.renamed) { %><br><span class="hint">sent as <%= r.sentAs %></span><% } %>
+                    <% if (r.renamed) { %><br><span class="c-feed__meta">sent as <%= r.sentAs %></span><% } %>
                   </td>
-                  <td><%= r.equipment %><% if (r.serial) { %><br><span class="hint">S/N <%= r.serial %></span><% } %></td>
-                  <td><%= r.due %><br><span class="hint"><%= r.daysLeft < 0 ? Math.abs(r.daysLeft) + 'd overdue' : 'in ' + r.daysLeft + 'd' %></span></td>
-                  <td>
-                    <span class="badge <%= r.email.status.startsWith('sent') ? 'badge-green' : (r.email.status === 'failed' ? 'badge-red' : 'badge-grey') %>"><%= r.email.status %></span>
-                    <% if (r.email.target) { %><br><span class="hint"><%= r.email.target %></span><% } %>
-                  </td>
-                  <td>
-                    <span class="badge <%= r.sms.status.startsWith('sent') ? 'badge-green' : (r.sms.status === 'failed' ? 'badge-red' : 'badge-grey') %>"><%= r.sms.status %></span>
-                    <% if (r.sms.target) { %><br><span class="hint"><%= r.sms.target %></span><% } %>
-                  </td>
+                  <td style="text-align:left;"><%= r.equipment %><% if (r.serial) { %><br><span class="c-feed__meta">S/N <%= r.serial %></span><% } %></td>
+                  <td style="text-align:left;"><%= r.due %><br><span class="c-feed__meta"><%= r.daysLeft < 0 ? Math.abs(r.daysLeft) + 'd overdue' : 'in ' + r.daysLeft + 'd' %></span></td>
+                  <td style="text-align:left;"><span class="c-pill <%= r.email.status.startsWith('sent') ? 'green' : 'grey' %>"><%= r.email.status %></span></td>
+                  <td><span class="c-pill <%= r.sms.status.startsWith('sent') ? 'green' : 'grey' %>"><%= r.sms.status %></span></td>
                 </tr>
               <% }) %>
             </tbody>
@@ -119,306 +533,28 @@
       </div>
 
       <div class="modal-footer">
-        <a href="/notifications" class="btn secondary"><i class="bi bi-bell"></i> Full notification log</a>
-        <button type="button" class="btn gold" data-bs-dismiss="modal">Got it</button>
+        <a href="/notifications" class="c-btn"><i class="bi bi-bell"></i> Full notification log</a>
+        <button type="button" class="c-btn primary" data-bs-dismiss="modal">Got it</button>
       </div>
     </div>
   </div>
 </div>
-<% } %>
-
-<div class="row g-3 mb-4">
-  <div class="col-12 col-md-4">
-    <div class="stat-card red h-100">
-      <div class="d-flex align-items-center justify-content-between">
-        <div>
-          <div class="num"><%= overdueCount %></div>
-          <div class="label">Overdue</div>
-        </div>
-        <i class="bi bi-exclamation-triangle-fill fs-2" style="color:var(--red); opacity:.8;"></i>
-      </div>
-    </div>
-  </div>
-  <div class="col-12 col-md-4">
-    <div class="stat-card amber h-100">
-      <div class="d-flex align-items-center justify-content-between">
-        <div>
-          <div class="num"><%= dueSoonCount %></div>
-          <div class="label">Due within 7 days</div>
-        </div>
-        <i class="bi bi-clock-fill fs-2" style="color:var(--amber); opacity:.8;"></i>
-      </div>
-    </div>
-  </div>
-  <div class="col-12 col-md-4">
-    <div class="stat-card h-100">
-      <div class="d-flex align-items-center justify-content-between">
-        <div>
-          <div class="num"><%= totalCount %></div>
-          <div class="label">Total equipment tracked</div>
-        </div>
-        <i class="bi bi-box-seam fs-2" style="color:var(--navy); opacity:.8;"></i>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="actions-row">
-  <div></div>
-  <div>
-    <a href="/customers" class="btn secondary"><i class="bi bi-people"></i> Manage Customers</a>
-    <a href="/notifications" class="btn secondary"><i class="bi bi-bell"></i> Notification Log</a>
-    <form method="POST" action="/notify-now" style="display:inline">
-      <button type="submit" class="btn secondary"><i class="bi bi-send"></i> Send Reminders Now</button>
-    </form>
-    <a href="/equipment/new" class="btn gold"><i class="bi bi-plus-lg"></i> Add Equipment</a>
-  </div>
-</div>
-
-<%- include('partials/searchbar') %>
-
-<% if (equipment.length === 0) { %>
-  <div class="empty-state">
-    No equipment yet. <a href="/customers/new">Add a customer</a> first, then <a href="/equipment/new">add their equipment</a>.
-  </div>
-<% } else { %>
-
-<!-- Instant, client-side filter of the table below (separate from the server-side serial-number search above) -->
-<div class="input-group mb-3" style="max-width: 420px;">
-  <span class="input-group-text bg-white"><i class="bi bi-funnel"></i></span>
-  <input type="text" id="quickFilter" class="form-control" placeholder="Quick filter this table…">
-</div>
-
-<table id="dashboardTable">
-  <thead>
-    <tr>
-      <th data-sort="text">Customer <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th data-sort="text">Category <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th data-sort="text">Equipment Type <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th data-sort="text">Brand <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th data-sort="text">Model <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th data-sort="text">Serial No. <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th data-sort="date">Last Calibration <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th data-sort="date">Next Calibration <i class="bi bi-arrow-down-up sort-icon"></i></th>
-      <th>Action</th>
-    </tr>
-  </thead>
-  <tbody>
-    <% equipment.forEach(e => { %>
-      <tr>
-        <td><%= e.customer_name %><br><span class="hint"><%= e.customer_phone || '' %></span></td>
-        <td><%= e.company_category || '—' %></td>
-        <td><%= e.equipment_type || '—' %></td>
-        <td><%= e.brand || '—' %></td>
-        <td><%= e.model || '—' %></td>
-        <td><%= e.serial_number || '—' %></td>
-        <td data-sort-value="<%= e.last_calibration_date || '' %>"><%= e.last_calibration_date || '—' %></td>
-        <td data-sort-value="<%= e.next_calibration_date || '' %>">
-          <%= e.next_calibration_date || '—' %> <span class="badge <%= e.badge.className %>"><%= e.badge.label %></span>
-        </td>
-        <td class="text-nowrap">
-          <a href="/equipment/<%= e.id %>/view" class="btn small secondary" title="View"><i class="bi bi-eye"></i> View</a>
-          <a href="/equipment/<%= e.id %>/edit" class="btn small secondary" title="Edit"><i class="bi bi-pencil-square"></i> Edit</a>
-          <form method="POST" action="/equipment/<%= e.id %>/delete" style="display:inline"
-                onsubmit="return confirm('Delete this equipment and all its calibration records?');">
-            <button type="submit" class="btn small danger" title="Delete"><i class="bi bi-trash"></i> Delete</button>
-          </form>
-        </td>
-      </tr>
-    <% }) %>
-  </tbody>
-</table>
-<div id="noResultsMsg" class="empty-state" style="display:none;">No rows match your filter.</div>
-
-<nav aria-label="Equipment table pages" class="mt-3">
-  <ul class="pagination justify-content-start mb-2" id="tablePagination"></ul>
-</nav>
-<div id="pageInfo" class="hint mb-4"></div>
 <% } %>
 
 <script>
-  // ---- Filter, sort and pagination ----
-  // These three have to share state. Pagination slices the FILTERED list, not
-  // the whole table, or filtering to 3 rows would still show "page 4 of 9".
-  // Sorting reorders the master list, then the filter and page slice are
-  // recomputed from it.
-  const PAGE_SIZE = 10;
-
-  const quickFilter = document.getElementById('quickFilter');
-  const dashboardTable = document.getElementById('dashboardTable');
-  const noResultsMsg = document.getElementById('noResultsMsg');
-  const paginationEl = document.getElementById('tablePagination');
-  const pageInfoEl = document.getElementById('pageInfo');
-
-  if (dashboardTable) {
-    const tbody = dashboardTable.querySelector('tbody');
-    const allRows = Array.from(tbody.querySelectorAll('tr'));
-    let filteredRows = allRows.slice();
-    let currentPage = 1;
-
-    function applyFilter() {
-      const q = quickFilter ? quickFilter.value.trim().toLowerCase() : '';
-      filteredRows = q
-        ? allRows.filter((row) => row.textContent.toLowerCase().includes(q))
-        : allRows.slice();
-    }
-
-    function render() {
-      const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
-      if (currentPage > totalPages) currentPage = totalPages;
-
-      // Hide everything, then show only this page's slice. Simpler and less
-      // error-prone than tracking which rows were visible last time.
-      allRows.forEach((row) => { row.style.display = 'none'; });
-
-      const start = (currentPage - 1) * PAGE_SIZE;
-      const pageRows = filteredRows.slice(start, start + PAGE_SIZE);
-      pageRows.forEach((row) => { row.style.display = ''; });
-
-      const isEmpty = filteredRows.length === 0;
-      dashboardTable.style.display = isEmpty ? 'none' : '';
-      if (noResultsMsg) noResultsMsg.style.display = isEmpty ? 'block' : 'none';
-
-      if (pageInfoEl) {
-        pageInfoEl.textContent = isEmpty
-          ? ''
-          : `Showing ${start + 1}–${start + pageRows.length} of ${filteredRows.length}`;
-      }
-
-      renderPagination(totalPages);
-    }
-
-    function renderPagination(totalPages) {
-      if (!paginationEl) return;
-      paginationEl.innerHTML = '';
-
-      // Follows Bootstrap's own pagination markup: active and disabled items
-      // use <span> rather than <a>, so they can't be clicked or tabbed to.
-      // Only real, navigable pages get an anchor.
-      const addItem = (label, page, opts = {}) => {
-        const li = document.createElement('li');
-        li.className = 'page-item'
-          + (opts.disabled ? ' disabled' : '')
-          + (opts.active ? ' active' : '');
-
-        if (opts.disabled || opts.active) {
-          const span = document.createElement('span');
-          span.className = 'page-link';
-          span.textContent = label;
-
-          if (opts.active) {
-            // Screen readers announce which page you're on; sighted users
-            // just see the highlighted button.
-            const sr = document.createElement('span');
-            sr.className = 'visually-hidden';
-            sr.textContent = '(current)';
-            span.appendChild(sr);
-          }
-
-          li.appendChild(span);
-        } else {
-          const a = document.createElement('a');
-          a.className = 'page-link';
-          a.href = '#';
-          a.textContent = label;
-          a.addEventListener('click', (e) => {
-            e.preventDefault();
-            currentPage = page;
-            render();
-            dashboardTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          });
-          li.appendChild(a);
-        }
-
-        paginationEl.appendChild(li);
-      };
-
-      addItem('Previous', currentPage - 1, { disabled: currentPage === 1 });
-
-      // Show first, last, and two either side of the current page. With 40
-      // pages, printing all 40 buttons would wrap onto three lines.
-      let lastPrinted = 0;
-      for (let p = 1; p <= totalPages; p++) {
-        const nearCurrent = Math.abs(p - currentPage) <= 2;
-        if (p !== 1 && p !== totalPages && !nearCurrent) continue;
-        if (lastPrinted && p - lastPrinted > 1) addItem('…', 0, { disabled: true });
-        addItem(String(p), p, { active: p === currentPage });
-        lastPrinted = p;
-      }
-
-      addItem('Next', currentPage + 1, { disabled: currentPage === totalPages });
-    }
-
-    if (quickFilter) {
-      quickFilter.addEventListener('input', () => {
-        applyFilter();
-        currentPage = 1;      // a new search always starts at the top
-        render();
-      });
-    }
-
-    // Sortable columns
-    const headers = dashboardTable.querySelectorAll('th[data-sort]');
-    headers.forEach((th, colIndex) => {
-      th.style.cursor = 'pointer';
-      let ascending = true;
-
-      th.addEventListener('click', () => {
-        const type = th.dataset.sort;
-
-        allRows.sort((a, b) => {
-          const cellA = a.children[colIndex];
-          const cellB = b.children[colIndex];
-          const valA = (cellA.dataset.sortValue !== undefined ? cellA.dataset.sortValue : cellA.textContent).trim();
-          const valB = (cellB.dataset.sortValue !== undefined ? cellB.dataset.sortValue : cellB.textContent).trim();
-
-          let cmp;
-          if (type === 'date') {
-            // Empty dates always sort to the end, regardless of direction
-            if (!valA && !valB) cmp = 0;
-            else if (!valA) cmp = 1;
-            else if (!valB) cmp = -1;
-            else cmp = new Date(valA) - new Date(valB);
-          } else {
-            cmp = valA.localeCompare(valB, undefined, { sensitivity: 'base' });
-          }
-          return ascending ? cmp : -cmp;
-        });
-
-        // Put the rows back in the new order, then recompute what's visible.
-        allRows.forEach((row) => tbody.appendChild(row));
-        applyFilter();
-        currentPage = 1;
-        render();
-        ascending = !ascending;
-      });
-    });
-
-    render();
-  }
-
-  // ---- Bootstrap-dependent bits ----
-  // Bootstrap's JS bundle is loaded at the bottom of the page (in the footer),
-  // which is AFTER this script runs. Waiting for the window 'load' event means
-  // the bundle is guaranteed to be parsed by the time we touch it. Without
-  // this, window.bootstrap is undefined here and nothing below ever fires.
+  // Bootstrap's bundle loads in console-footer, after this runs, so wait for
+  // 'load' before touching it.
   window.addEventListener('load', () => {
     if (!window.bootstrap) return;
 
-    // Pop the proof-of-send dialog open right away.
     const autoRunModalEl = document.getElementById('autoRunModal');
-    if (autoRunModalEl) {
-      bootstrap.Modal.getOrCreateInstance(autoRunModalEl).show();
-    }
+    if (autoRunModalEl) bootstrap.Modal.getOrCreateInstance(autoRunModalEl).show();
 
-    // Auto-dismiss the success flash message after a few seconds.
     const flashAlert = document.getElementById('flashAlert');
     if (flashAlert) {
-      setTimeout(() => {
-        bootstrap.Alert.getOrCreateInstance(flashAlert).close();
-      }, 5000);
+      setTimeout(() => { bootstrap.Alert.getOrCreateInstance(flashAlert).close(); }, 5000);
     }
   });
 </script>
 
-<%- include('partials/footer') %>
+<%- include('partials/console-footer') %>

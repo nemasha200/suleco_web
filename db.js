@@ -11,7 +11,9 @@ CREATE TABLE IF NOT EXISTS customers (
   name TEXT NOT NULL,
   company TEXT,
   phone TEXT,
+  phone2 TEXT,          -- optional second contact number
   email TEXT,
+  email2 TEXT,          -- optional second email address
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -116,6 +118,10 @@ const addColumnIfMissing = (name, ddl) => {
 addColumnIfMissing('equipment_type', 'equipment_type TEXT');
 addColumnIfMissing('model', 'model TEXT');
 addColumnIfMissing('sold_by_us', "sold_by_us TEXT DEFAULT 'No'");
+// SQLite will not accept a non-constant default (datetime('now')) in ALTER
+// TABLE, so this goes on with no default and the insert sets it explicitly.
+// Rows that existed before the column was added keep NULL here.
+addColumnIfMissing('created_at', 'created_at TEXT');
 addColumnIfMissing('purchase_date', 'purchase_date TEXT');
 addColumnIfMissing('warranty_period_months', 'warranty_period_months INTEGER');
 addColumnIfMissing('last_notified_date', 'last_notified_date TEXT');
@@ -140,6 +146,53 @@ const addCalibrationColumnIfMissing = (name, ddl) => {
 addCalibrationColumnIfMissing('repair', "repair TEXT DEFAULT 'No'");
 addCalibrationColumnIfMissing('spare_part_replacement', 'spare_part_replacement TEXT');
 addCalibrationColumnIfMissing('repair_description', 'repair_description TEXT');
+
+// ---- Three-stage service workflow (Check In -> Approval -> Service) ----
+// A calibration record is now created at check-in and completed later, so it
+// carries the stage it has reached plus the fields each stage collects.
+addCalibrationColumnIfMissing('stage', "stage TEXT DEFAULT 'checkin'");
+addCalibrationColumnIfMissing('check_in_date', 'check_in_date TEXT');
+addCalibrationColumnIfMissing('equipment_return', "equipment_return TEXT DEFAULT 'No'");
+addCalibrationColumnIfMissing('quotation_sent', "quotation_sent TEXT DEFAULT 'No'");
+addCalibrationColumnIfMissing('po_received', "po_received TEXT DEFAULT 'No'");
+addCalibrationColumnIfMissing('approved_at', 'approved_at TEXT');
+addCalibrationColumnIfMissing('technicians', 'technicians TEXT');
+
+// Fixed rupee discount applied to a service bill before SSCL and VAT.
+addCalibrationColumnIfMissing('discount', 'discount REAL DEFAULT 0');
+
+// Approval is ticked off over several days, so we note when it was last
+// saved — separate from approved_at, which marks when service actually began.
+addCalibrationColumnIfMissing('approval_updated_at', 'approval_updated_at TEXT');
+
+// Each approval box records the date it was ticked, so the card shows when a
+// quotation went out or a PO landed rather than just that it did.
+addCalibrationColumnIfMissing('equipment_return_date', 'equipment_return_date TEXT');
+addCalibrationColumnIfMissing('quotation_sent_date', 'quotation_sent_date TEXT');
+addCalibrationColumnIfMissing('po_received_date', 'po_received_date TEXT');
+
+// Released back to the customer without being serviced: the job ends at
+// approval. It keeps its record in Services but leaves the in-progress queue,
+// because nobody is going to work on it.
+addCalibrationColumnIfMissing('released_without_service', "released_without_service TEXT DEFAULT 'No'");
+addCalibrationColumnIfMissing('released_date', 'released_date TEXT');
+
+// Records that existed before the workflow did are finished jobs, not
+// half-started ones — mark them complete so they don't show up as pending.
+db.prepare("UPDATE calibrations SET stage = 'done' WHERE stage IS NULL OR stage = ''").run();
+
+// Same safety net for the customers table. Some clients give a second contact
+// number and/or a second email; both are optional and reminders go to every
+// one that's filled in (see utils/scheduler.js).
+const customerCols = db.prepare("PRAGMA table_info(customers)").all().map(c => c.name);
+const addCustomerColumnIfMissing = (name, ddl) => {
+  if (!customerCols.includes(name)) {
+    db.exec(`ALTER TABLE customers ADD COLUMN ${ddl}`);
+    customerCols.push(name);
+  }
+};
+addCustomerColumnIfMissing('phone2', 'phone2 TEXT');
+addCustomerColumnIfMissing('email2', 'email2 TEXT');
 
 // Historical cleanup: very old versions of this app had a redundant 'notes'
 // column that's no longer used anywhere. If a database still has it, rebuild
@@ -227,6 +280,10 @@ seedOptionsIfEmpty('equipment_type', ['Auto Level', 'Total Station', 'TL', 'DL']
 seedOptionsIfEmpty('brand', ['Topcon', 'Leica', 'South', 'Stonex', 'Sokkia']);
 seedOptionsIfEmpty('model', ['GS', 'WS', 'WP', 'S900']);
 seedOptionsIfEmpty('calibration_description', ['One Day Service', 'Normal Service', 'Repair', 'Full Service', 'Selling']);
+
+// Technicians for the Group 3 dropdown. Seeded only when the list is empty,
+// like the others — so a name deleted through the app stays deleted.
+seedOptionsIfEmpty('technician', ['Maulith', 'Sanjaya', 'Chalaka', 'Tharaka']);
 
 // One-time seed so the app isn't empty on first run
 const count = db.prepare('SELECT COUNT(*) AS c FROM customers').get().c;

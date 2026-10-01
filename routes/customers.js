@@ -2,19 +2,8 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
-// Must match the scheduler's window, so "will this customer still get a
-// reminder for this due date?" is answered the same way in both places.
 const REMIND_DAYS_BEFORE = Number(process.env.REMIND_DAYS_BEFORE) || 7;
 
-// When a customer's phone or email changes, any reminder already sent for
-// their current due dates went to the OLD address. The sweep stamps
-// reminded_for_due_date after a successful send and skips that instrument
-// until the due date changes — so without this, correcting a typo'd address
-// would never produce a corrected reminder.
-//
-// Clearing the stamp puts those instruments back in the queue. Only ones
-// still inside the reminder window are cleared; instruments due months out
-// are untouched, since their reminder hasn't been sent yet anyway.
 const requeueDueReminders = db.prepare(`
   UPDATE equipment
   SET reminded_for_due_date = NULL
@@ -22,6 +11,18 @@ const requeueDueReminders = db.prepare(`
     AND next_calibration_date IS NOT NULL
     AND next_calibration_date <= date('now', '+' || ? || ' days')
 `);
+
+function getAlertCount() {
+  try {
+    const result = db.prepare(`
+      SELECT COUNT(*) as count FROM notifications 
+      WHERE read_status = 0 OR read_status IS NULL
+    `).get();
+    return result ? result.count : 0;
+  } catch (err) {
+    return 0;
+  }
+}
 
 router.get('/', (req, res) => {
   const customers = db.prepare(`
@@ -31,54 +32,118 @@ router.get('/', (req, res) => {
     GROUP BY customers.id
     ORDER BY customers.name ASC
   `).all();
-  res.render('customers/list', { customers, username: req.session.username });
+  
+  res.render('customers/list', { 
+    customers, 
+    username: req.session.username || 'admin',
+    activeNav: 'customers',
+    alertCount: getAlertCount()
+  });
 });
 
 router.get('/new', (req, res) => {
-  res.render('customers/form', { customer: null, username: req.session.username });
+  const flash = req.session.flash || null;
+  if (req.session.flash) delete req.session.flash;
+  
+  res.render('customers/form', {
+    customer: null,
+    prefillName: req.query.name || '',
+    existingCustomers: db.prepare(
+      'SELECT id, name, company, phone, email FROM customers ORDER BY name ASC'
+    ).all(),
+    username: req.session.username || 'admin',
+    activeNav: 'customers',
+    alertCount: getAlertCount(),
+    flash: flash
+  });
 });
 
 router.post('/new', (req, res) => {
-  const { name, company, phone, email } = req.body;
-  db.prepare('INSERT INTO customers (name, company, phone, email) VALUES (?, ?, ?, ?)')
-    .run(name, company, phone, email);
-  res.redirect('/customers');
+  const { name, email, phone, company } = req.body;
+  
+  if (!name || !email) {
+    req.session.flash = 'Name and email are required.';
+    return res.redirect('/customers/new');
+  }
+  
+  try {
+    db.prepare(
+      'INSERT INTO customers (name, email, phone, company, created_at) VALUES (?, ?, ?, ?, datetime("now"))'
+    ).run(name, email, phone || '', company || '');
+    
+    req.session.flash = 'Customer added successfully.';
+    res.redirect('/customers');
+  } catch (err) {
+    console.error('Error adding customer:', err);
+    req.session.flash = 'Error adding customer.';
+    res.redirect('/customers/new');
+  }
 });
 
 router.get('/:id/edit', (req, res) => {
   const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.params.id);
   if (!customer) return res.redirect('/customers');
-  res.render('customers/form', { customer, username: req.session.username });
+  
+  const flash = req.session.flash || null;
+  if (req.session.flash) delete req.session.flash;
+  
+  res.render('customers/form', { 
+    customer,
+    username: req.session.username || 'admin',
+    activeNav: 'customers',
+    alertCount: getAlertCount(),
+    flash: flash
+  });
 });
 
 router.post('/:id/edit', (req, res) => {
-  const { name, company, phone, email } = req.body;
-
-  // Read the old values BEFORE updating, so we can tell whether the contact
-  // details actually changed. Renaming a company shouldn't re-send anything.
-  const before = db.prepare('SELECT phone, email FROM customers WHERE id = ?').get(req.params.id);
+  const { name, email, phone, company } = req.body;
+  
+  if (!name || !email) {
+    req.session.flash = 'Name and email are required.';
+    return res.redirect(`/customers/${req.params.id}/edit`);
+  }
+  
+  const before = db.prepare(
+    'SELECT phone, email FROM customers WHERE id = ?'
+  ).get(req.params.id);
+  
   if (!before) return res.redirect('/customers');
 
-  db.prepare('UPDATE customers SET name = ?, company = ?, phone = ?, email = ? WHERE id = ?')
-    .run(name, company, phone, email, req.params.id);
+  try {
+    db.prepare(
+      'UPDATE customers SET name = ?, email = ?, phone = ?, company = ? WHERE id = ?'
+    ).run(name, email, phone || '', company || '', req.params.id);
 
-  const contactChanged =
-    (before.phone || '') !== (phone || '') ||
-    (before.email || '') !== (email || '');
+    const contactChanged =
+      (before.phone || '') !== (phone || '') ||
+      (before.email || '') !== (email || '');
 
-  if (contactChanged) {
-    const requeued = requeueDueReminders.run(req.params.id, REMIND_DAYS_BEFORE).changes;
-    if (requeued > 0) {
-      console.log(`Customer #${req.params.id} contact details changed — ${requeued} due/overdue instrument(s) re-queued for a fresh reminder.`);
-      req.session.flash = `Contact details updated. ${requeued} reminder${requeued === 1 ? '' : 's'} will be re-sent to the new details on the next run.`;
+    if (contactChanged) {
+      const requeued = requeueDueReminders.run(req.params.id, REMIND_DAYS_BEFORE).changes;
+      if (requeued > 0) {
+        req.session.flash = `Contact updated. ${requeued} reminder(s) will be re-sent.`;
+      }
+    } else {
+      req.session.flash = 'Customer updated successfully.';
     }
-  }
 
-  res.redirect('/customers');
+    res.redirect('/customers');
+  } catch (err) {
+    console.error('Error updating customer:', err);
+    req.session.flash = 'Error updating customer.';
+    res.redirect(`/customers/${req.params.id}/edit`);
+  }
 });
 
 router.post('/:id/delete', (req, res) => {
-  db.prepare('DELETE FROM customers WHERE id = ?').run(req.params.id);
+  try {
+    db.prepare('DELETE FROM customers WHERE id = ?').run(req.params.id);
+    req.session.flash = 'Customer deleted.';
+  } catch (err) {
+    console.error('Error deleting customer:', err);
+    req.session.flash = 'Error deleting customer.';
+  }
   res.redirect('/customers');
 });
 
